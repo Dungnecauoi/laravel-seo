@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Deliberately minimal: this file has to be understood by PHPUnit 9.6
+    (Laravel 9, PHP 8.1) through PHPUnit 12 (Laravel 13). The <source> and
+    cacheDirectory elements are 10+ only, and <coverage><include> is 9 only,
+    so neither appears here. Coverage is configured with CLI flags in CI.
+-->
+<phpunit bootstrap="vendor/autoload.php"
+         colors="true"
+         failOnWarning="true"
+         failOnRisky="true">
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

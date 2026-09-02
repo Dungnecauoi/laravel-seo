@@ -1,0 +1,83 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    name: L${{ matrix.laravel }} · PHP ${{ matrix.php }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Spelled out rather than built with excludes: each row states the
+        # Testbench release that pairs with that Laravel major, which is the
+        # thing that actually has to be right.
+        include:
+          - { laravel: 9,  php: '8.1', testbench: '^7.0'  }
+          - { laravel: 10, php: '8.1', testbench: '^8.0'  }
+          - { laravel: 10, php: '8.3', testbench: '^8.0'  }
+          - { laravel: 11, php: '8.2', testbench: '^9.0'  }
+          - { laravel: 11, php: '8.4', testbench: '^9.0'  }
+          - { laravel: 12, php: '8.2', testbench: '^10.0' }
+          - { laravel: 12, php: '8.5', testbench: '^10.0' }
+          - { laravel: 13, php: '8.3', testbench: '^11.0' }
+          - { laravel: 13, php: '8.5', testbench: '^11.0' }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, json, libxml, intl, sqlite3
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require --dev --no-update "orchestra/testbench:${{ matrix.testbench }}"
+          composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
+  # The extension is optional and has a fallback, so the fallback path needs
+  # its own run — otherwise it is only ever exercised on machines nobody uses.
+  without-intl:
+    runs-on: ubuntu-latest
+    name: L13 · PHP 8.4 · no ext-intl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, json, libxml, sqlite3
+          coverage: none
+
+      - run: composer update --prefer-dist --no-interaction --no-progress
+      - run: vendor/bin/phpunit
+
+  lowest:
+    runs-on: ubuntu-latest
+    name: L9 · PHP 8.1 · lowest deps
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: dom, json, libxml, intl, sqlite3
+          coverage: none
+
+      - run: |
+          composer require --dev --no-update "orchestra/testbench:^7.0"
+          composer update --prefer-dist --prefer-lowest --no-interaction --no-progress
+      - run: vendor/bin/phpunit
