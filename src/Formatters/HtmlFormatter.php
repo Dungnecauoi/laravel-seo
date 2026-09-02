@@ -10,6 +10,9 @@ use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SeoContext;
 use Illuminate\Support\HtmlString;
 
+// JSON-LD is appended here rather than left as a separate call, so a layout
+// that echoes seoTags() gets structured data without having to know it exists.
+
 /**
  * Renders meta tags for a Blade layout.
  *
@@ -22,6 +25,7 @@ final class HtmlFormatter implements OutputFormatter
     public function __construct(
         private readonly LocaleResolver $locales,
         private readonly UrlGenerator $urls,
+        private readonly JsonLdFormatter $jsonLd,
     ) {
     }
 
@@ -63,6 +67,12 @@ final class HtmlFormatter implements OutputFormatter
 
         foreach ($this->twitter($context) as $line) {
             $lines[] = $line;
+        }
+
+        $jsonLd = (string) $this->jsonLd->format($context);
+
+        if ($jsonLd !== '') {
+            $lines[] = $jsonLd;
         }
 
         return new HtmlString(implode("\n", $lines));

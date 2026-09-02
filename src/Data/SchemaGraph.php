@@ -72,24 +72,45 @@ final class SchemaGraph
      * Dangling references are the classic bug in a hand-assembled graph, so
      * this is asserted in tests and surfaced by `seo:doctor`.
      *
+     * Only `['@id' => …]` standing alone counts as a reference. An `@id`
+     * alongside other properties is a node declaring its own identity — a
+     * nested ImageObject, say — and reporting that as dangling would flag
+     * every correctly-built graph.
+     *
      * @return list<string>
      */
     public function danglingReferences(): array
     {
         $referenced = [];
 
-        array_walk_recursive(
-            $this->nodes,
-            function (mixed $value, int|string $key) use (&$referenced): void {
-                if ($key === '@id' && is_string($value)) {
-                    $referenced[] = $value;
-                }
-            },
-        );
+        foreach ($this->nodes as $node) {
+            $this->collectReferences($node, $referenced);
+        }
 
         $missing = array_diff(array_unique($referenced), array_keys($this->nodes));
 
         return array_values($missing);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $value
+     * @param  list<string>  $found
+     */
+    private function collectReferences(array $value, array &$found): void
+    {
+        foreach ($value as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            if (array_keys($item) === ['@id'] && is_string($item['@id'])) {
+                $found[] = $item['@id'];
+
+                continue;
+            }
+
+            $this->collectReferences($item, $found);
+        }
     }
 
     /**

@@ -9,6 +9,7 @@ use Duxbo\Seo\Contracts\MetadataRepository;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Formatters\ArrayFormatter;
 use Duxbo\Seo\Formatters\HtmlFormatter;
+use Duxbo\Seo\Formatters\JsonLdFormatter;
 use Duxbo\Seo\Locale\AppLocaleResolver;
 use Duxbo\Seo\Resolution\Resolver;
 use Duxbo\Seo\Resolution\TokenExpander;
@@ -17,6 +18,9 @@ use Duxbo\Seo\Resolution\Tokens\ConfigToken;
 use Duxbo\Seo\Resolution\Tokens\DateToken;
 use Duxbo\Seo\Resolution\Tokens\FieldToken;
 use Duxbo\Seo\Resolution\Tokens\NowToken;
+use Duxbo\Seo\Schema\GraphAssembler;
+use Duxbo\Seo\Schema\SchemaNormalizer;
+use Duxbo\Seo\Schema\SchemaValidator;
 use Duxbo\Seo\Storage\EloquentMetadataRepository;
 use Duxbo\Seo\Storage\SeoDataMapper;
 use Duxbo\Seo\Support\Compat;
@@ -62,16 +66,36 @@ final class SeoServiceProvider extends ServiceProvider
             return new Resolver($app, $stages);
         });
 
+        $this->app->singleton(GraphAssembler::class, function ($app): GraphAssembler {
+            $assembler = new GraphAssembler($app, $app->make(SchemaNormalizer::class));
+
+            if ($app->make(Config::class)->get('seo.schema.enabled', true) !== true) {
+                return $assembler;
+            }
+
+            /** @var list<class-string<\Duxbo\Seo\Contracts\SchemaProvider>> $providers */
+            $providers = $app->make(Config::class)->get('seo.schema.providers', []);
+
+            foreach ($providers as $provider) {
+                $assembler->register($provider);
+            }
+
+            return $assembler;
+        });
+
         $this->app->singleton(Seo::class, function ($app): Seo {
             $seo = new Seo(
                 $app->make(Resolver::class),
                 $app->make(TokenExpander::class),
                 $app->make(MetadataRepository::class),
                 $app->make(LocaleResolver::class),
+                $app->make(GraphAssembler::class),
+                $app->make(SchemaValidator::class),
             );
 
             $seo->registerFormatter($app->make(HtmlFormatter::class));
             $seo->registerFormatter($app->make(ArrayFormatter::class));
+            $seo->registerFormatter($app->make(JsonLdFormatter::class));
 
             return $seo;
         });

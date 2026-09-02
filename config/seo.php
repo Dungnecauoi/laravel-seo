@@ -178,4 +178,59 @@ return [
         'date_format' => 'd/m/Y',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Structured data
+    |--------------------------------------------------------------------------
+    |
+    | Nodes are emitted flat inside one @graph and reference each other by @id,
+    | which is how Google reads context between them.
+    |
+    | Models describe themselves by implementing Duxbo\Seo\Contracts\HasSchema
+    | and returning a plain array — any schema.org type at all, not only the
+    | ones anticipated here. Duxbo\Seo\Schema\Types offers shorthand for the
+    | shapes whose nesting is easy to get wrong.
+    |
+    */
+
+    'schema' => [
+
+        'enabled' => true,
+
+        // Leaving 'name' null omits the Organization node entirely, and every
+        // reference to it is pruned rather than left dangling.
+        'organization' => [
+            'type' => 'Organization',   // or LocalBusiness
+            'name' => null,
+            'url' => null,
+            'logo' => null,
+            'logo_width' => null,
+            'logo_height' => null,
+            'sameAs' => [],
+
+            // LocalBusiness also wants these.
+            // 'telephone'  => null,
+            // 'address'    => ['@type' => 'PostalAddress', 'addressLocality' => null],
+            // 'priceRange' => null,
+        ],
+
+        'website' => [
+            // Enables the sitelinks search box. Must contain the placeholder.
+            // '/tim-kiem?q={search_term_string}'
+            'search_url' => null,
+        ],
+
+        // Remove one to drop it, add your own to extend the graph. Order does
+        // not matter here; each provider declares its own priority so nodes
+        // are registered before anything that references them.
+        'providers' => [
+            Duxbo\Seo\Schema\Providers\OrganizationProvider::class,
+            Duxbo\Seo\Schema\Providers\WebSiteProvider::class,
+            Duxbo\Seo\Schema\Providers\PrimaryImageProvider::class,
+            Duxbo\Seo\Schema\Providers\BreadcrumbProvider::class,
+            Duxbo\Seo\Schema\Providers\WebPageProvider::class,
+            Duxbo\Seo\Schema\Providers\ModelSchemaProvider::class,
+        ],
+    ],
+
 ];

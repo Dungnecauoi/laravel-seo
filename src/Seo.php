@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo;
 
+use Duxbo\Seo\Contracts\HasBreadcrumbs;
 use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\MetadataRepository;
 use Duxbo\Seo\Contracts\OutputFormatter;
+use Duxbo\Seo\Contracts\SchemaProvider;
 use Duxbo\Seo\Contracts\Seoable;
 use Duxbo\Seo\Contracts\TokenResolver;
+use Duxbo\Seo\Data\SchemaGraph;
 use Duxbo\Seo\Data\SeoContext;
 use Duxbo\Seo\Data\SeoData;
 use Duxbo\Seo\Exceptions\UnknownFormatter;
 use Duxbo\Seo\Resolution\Resolver;
 use Duxbo\Seo\Resolution\SeoDataBuilder;
 use Duxbo\Seo\Resolution\TokenExpander;
+use Duxbo\Seo\Schema\GraphAssembler;
+use Duxbo\Seo\Schema\SchemaValidator;
 use Illuminate\Support\HtmlString;
 
 /**
@@ -30,6 +35,8 @@ final class Seo
         private readonly TokenExpander $expander,
         private readonly MetadataRepository $repository,
         private readonly LocaleResolver $locales,
+        private readonly GraphAssembler $assembler,
+        private readonly SchemaValidator $validator,
     ) {
     }
 
@@ -46,21 +53,50 @@ final class Seo
      */
     public function forUrl(string $url, ?string $locale = null): SeoData
     {
-        return $this->resolver
-            ->resolve(SeoContext::forUrl($url, $locale ?? $this->locales->current()))
-            ->data;
+        return $this->resolve(
+            SeoContext::forUrl($url, $locale ?? $this->locales->current()),
+        )->data;
     }
 
     public function context(Seoable $model, ?string $locale = null): SeoContext
     {
-        return $this->resolver->resolve(
+        return $this->resolve(
             SeoContext::for($model, $locale ?? $this->locales->current()),
         );
     }
 
+    /**
+     * The single funnel every other entry point goes through.
+     *
+     * Nothing else may call the resolver directly. When context() did, model
+     * breadcrumbs appeared through seoTags() and silently vanished through
+     * Seo::schema() — the same shape of bug twice over.
+     */
     public function resolve(SeoContext $context): SeoContext
     {
-        return $this->resolver->resolve($context);
+        return $this->resolver->resolve($this->enrich($context));
+    }
+
+    /**
+     * Add what the model can contribute but the pipeline does not ask for.
+     *
+     * Done here rather than in the trait so every entry point behaves the same.
+     * When this lived in the trait, breadcrumbs appeared through seoTags() and
+     * silently vanished through Seo::schema().
+     */
+    private function enrich(SeoContext $context): SeoContext
+    {
+        $model = $context->model;
+
+        if ($model instanceof HasBreadcrumbs && $context->get('breadcrumbs') === null) {
+            $crumbs = $model->seoBreadcrumbs();
+
+            if ($crumbs !== []) {
+                $context = $context->put('breadcrumbs', $crumbs);
+            }
+        }
+
+        return $context;
     }
 
     /**
@@ -71,7 +107,7 @@ final class Seo
         $context = match (true) {
             $subject instanceof SeoContext => $subject,
             $subject instanceof Seoable => $this->context($subject, $locale),
-            default => $this->resolver->resolve(
+            default => $this->resolve(
                 SeoContext::forUrl(url()->current(), $locale ?? $this->locales->current()),
             ),
         };
@@ -120,6 +156,51 @@ final class Seo
         $this->expander->forget($key);
 
         return $this;
+    }
+
+    /**
+     * The JSON-LD graph for a page, before rendering.
+     */
+    public function schema(Seoable|SeoContext $subject, ?string $locale = null): SchemaGraph
+    {
+        return $this->assembler->build(
+            $subject instanceof SeoContext ? $subject : $this->context($subject, $locale),
+        );
+    }
+
+    /**
+     * Problems Google would silently drop the rich result over.
+     *
+     * @return list<string>
+     */
+    public function validateSchema(Seoable|SeoContext $subject, ?string $locale = null): array
+    {
+        return $this->validator->validate($this->schema($subject, $locale));
+    }
+
+    /**
+     * @param  class-string<SchemaProvider>|SchemaProvider  $provider
+     */
+    public function registerSchema(string|SchemaProvider $provider): self
+    {
+        $this->assembler->register($provider);
+
+        return $this;
+    }
+
+    /**
+     * @param  class-string<SchemaProvider>  $provider
+     */
+    public function removeSchema(string $provider): self
+    {
+        $this->assembler->remove($provider);
+
+        return $this;
+    }
+
+    public function graph(): GraphAssembler
+    {
+        return $this->assembler;
     }
 
     public function registerFormatter(OutputFormatter $formatter): self

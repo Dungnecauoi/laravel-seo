@@ -113,6 +113,11 @@ final class ConfigUrlGenerator implements UrlGeneratorContract
         return $this->urls->to($url);
     }
 
+    public function home(): string
+    {
+        return rtrim($this->urls->to('/'), '/').'/';
+    }
+
     /**
      * @return list<string>
      */

@@ -119,6 +119,20 @@ trait HasSeo
     }
 
     /**
+     * The breadcrumb trail leading to this record.
+     *
+     * Only consulted when the model also declares
+     * {@see \Duxbo\Seo\Contracts\HasBreadcrumbs} — a trail is not something
+     * every model has, so it is opted into rather than assumed.
+     *
+     * @return list<mixed>
+     */
+    public function seoBreadcrumbs(): array
+    {
+        return [];
+    }
+
+    /**
      * Resolved metadata for this record.
      */
     public function seo(?string $locale = null): SeoData
@@ -133,6 +147,8 @@ trait HasSeo
         // different question from "the row for the language we are serving".
         $locale ??= app(LocaleResolver::class)->current();
 
+        // Breadcrumbs and anything else the model contributes are added by
+        // Seo::resolve(), so every entry point behaves identically.
         $context = SeoContext::for($this, $locale);
 
         // Hand an eager-loaded row straight to the pipeline so the stored-value

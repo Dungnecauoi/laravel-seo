@@ -24,4 +24,14 @@ interface UrlGenerator
      * Make a possibly relative URL absolute against the configured site root.
      */
     public function absolute(string $url): string;
+
+    /**
+     * The site root, always with a trailing slash.
+     *
+     * Site-wide schema nodes anchor their `@id` here, and `https://site.vn/#organization`
+     * is the form every other tool writes. Laravel's own url('/') drops the
+     * slash, which would make the identifier both unconventional and
+     * inconsistent with the URLs beside it.
+     */
+    public function home(): string;
 }

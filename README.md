@@ -43,11 +43,37 @@ Load a whole index page without a query per record:
 $posts = Post::query()->withSeo()->paginate();
 ```
 
+### Structured data
+
+Implement `HasSchema` and return a plain array. Any schema.org type works, not
+only the ones this package anticipated — the assembler supplies the `@id`, links
+the node to the page and publisher, rewrites dates to ISO 8601, and makes URLs
+absolute.
+
+```php
+public function seoSchema(SeoContext $context): array
+{
+    return [
+        '@type' => 'Article',
+        'headline' => $this->name,
+        'datePublished' => $this->published_at,   // any parseable format
+        'image' => $this->cover_url,              // may be relative
+        'author' => Types::person($this->author_name),
+    ];
+}
+```
+
+`Duxbo\Seo\Schema\Types` covers the shapes whose nesting is easy to get wrong —
+a price belongs inside an `Offer`, an FAQ answer is its own node.
+
+`Seo::validateSchema($post)` lists what Google would silently drop the rich
+result over.
+
 | Milestone | Scope | State |
 |---|---|---|
 | M1 | Contracts, data objects, Compat | done |
 | M2 | Storage, `HasSeo` trait, resolution pipeline, HTML output | done |
-| M3 | schema.org `@graph` | |
+| M3 | schema.org `@graph` | done |
 | M4 | Sitemap, robots.txt | |
 | M5 | Redirects, 404 monitor | |
 | M6 | HTTP API, headless formatters | |
