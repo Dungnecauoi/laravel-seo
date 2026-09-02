@@ -233,4 +233,176 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Sitemap
+    |--------------------------------------------------------------------------
+    |
+    | Sources are opt-in, one at a time, and nothing is discovered. Registering
+    | every model with the trait automatically would push drafts, private
+    | records and soft-deleted rows onto a public sitemap.
+    |
+    |   'sources' => [
+    |       ['model' => App\Models\Post::class, 'name' => 'posts',
+    |        'scope' => fn ($q) => $q->where('published', true),
+    |        'changefreq' => 'weekly', 'priority' => 0.8],
+    |
+    |       ['pages' => ['/', '/gioi-thieu', '/lien-he']],
+    |   ],
+    |
+    */
+
+    'sitemap' => [
+        'enabled' => true,
+
+        // Protocol maximum is 50,000; anything higher is clamped.
+        'max_urls' => 50000,
+
+        // Seconds. Zero rebuilds on every request.
+        'cache_ttl' => 3600,
+
+        'sources' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | robots.txt
+    |--------------------------------------------------------------------------
+    |
+    | Turn this off if the project already serves a static public/robots.txt,
+    | rather than having two sources of truth.
+    |
+    */
+
+    'robots' => [
+        'enabled' => true,
+
+        'groups' => [
+            '*' => [
+                'disallow' => [],
+            ],
+        ],
+
+        // Extra sitemap URLs to advertise besides this package's own.
+        'sitemaps' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Redirects
+    |--------------------------------------------------------------------------
+    |
+    | By default rules are checked only once a request has already 404ed, which
+    | costs nothing on the paths that match a real route. Set 'eager' to check
+    | before routing instead, which suits a large imported rule set.
+    |
+    | 'allowed_hosts' is a security control, not a convenience: without it,
+    | anyone able to write a redirect rule could turn a trusted URL on your
+    | domain into a phishing link. Your own APP_URL host is always allowed.
+    |
+    */
+
+    'redirects' => [
+        'enabled' => true,
+        'table' => 'seo_redirects',
+        'eager' => false,
+        'keep_query' => true,
+        'cache_ttl' => 3600,
+        'allowed_hosts' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | 404 monitor
+    |--------------------------------------------------------------------------
+    |
+    | Every limit here exists because of crawler traffic, not real visitors: a
+    | bot probing for /wp-admin and /.env produces tens of thousands of distinct
+    | paths a day.
+    |
+    */
+
+    'not_found' => [
+        'enabled' => true,
+        'table' => 'seo_not_found',
+
+        // Oldest and least-hit rows are dropped once the table exceeds this.
+        'max_rows' => 10000,
+
+        // Record a fraction of hits on a busy site. 1.0 records everything.
+        'sample_rate' => 1.0,
+
+        'exclude' => [
+            '#\.(js|css|map|ico|png|jpe?g|gif|svg|woff2?|ttf)$#i',
+            '#^/(wp-admin|wp-login|wp-content|xmlrpc)#i',
+            '#^/(\.env|\.git|vendor|storage/framework)#i',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP API
+    |--------------------------------------------------------------------------
+    |
+    | Disabled by default. This surface writes site-wide metadata and reads the
+    | 404 log, so it is opted into rather than exposed by installing.
+    |
+    | The Gate below denies everyone unless the application defines it. That is
+    | deliberate: an SEO panel can rewrite every title on the site and redirect
+    | any URL, so the failure mode of forgetting to configure it must be a
+    | locked door, not an open one.
+    |
+    | 'models' is an allowlist of morph aliases the API may address. Without it
+    | the endpoints would let a caller enumerate every model by guessing class
+    | names.
+    |
+    */
+
+    'api' => [
+        'enabled' => false,
+        'prefix' => 'api/seo/v1',
+        'middleware' => ['api', 'can:viewSeoPanel'],
+        'models' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Content analysis
+    |--------------------------------------------------------------------------
+    |
+    | Checks declare which locales they understand and sit out the rest, so the
+    | English readability measures never run on Vietnamese content — they would
+    | produce a confident number that means nothing.
+    |
+    | Remove a check to drop it; override a weight to change how much it counts.
+    |
+    */
+
+    'analysis' => [
+        'checks' => [
+            Duxbo\Seo\Analysis\Checks\Universal\KeywordInTitle::class,
+            Duxbo\Seo\Analysis\Checks\Universal\KeywordInDescription::class,
+            Duxbo\Seo\Analysis\Checks\Universal\KeywordInUrl::class,
+            Duxbo\Seo\Analysis\Checks\Universal\KeywordInOpening::class,
+            Duxbo\Seo\Analysis\Checks\Universal\KeywordInHeadings::class,
+            Duxbo\Seo\Analysis\Checks\Universal\KeywordInImageAlt::class,
+            Duxbo\Seo\Analysis\Checks\Universal\KeywordDensity::class,
+            Duxbo\Seo\Analysis\Checks\Universal\TitleLength::class,
+            Duxbo\Seo\Analysis\Checks\Universal\DescriptionLength::class,
+            Duxbo\Seo\Analysis\Checks\Universal\ContentLength::class,
+            Duxbo\Seo\Analysis\Checks\Universal\InternalLinks::class,
+            Duxbo\Seo\Analysis\Checks\Universal\ExternalLinks::class,
+            Duxbo\Seo\Analysis\Checks\Universal\ImagesHaveAlt::class,
+            Duxbo\Seo\Analysis\Checks\Universal\SingleH1::class,
+
+            Duxbo\Seo\Analysis\Checks\Vi\VietnameseReadability::class,
+            Duxbo\Seo\Analysis\Checks\Vi\VietnamesePassiveVoice::class,
+
+            Duxbo\Seo\Analysis\Checks\En\FleschReadingEase::class,
+        ],
+
+        // 'keyword-density' => 5
+        'weights' => [],
+    ],
+
 ];

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo;
 
+use Duxbo\Seo\Analysis\Analyzer;
+use Duxbo\Seo\Contracts\AnalysisCheck;
 use Duxbo\Seo\Contracts\HasBreadcrumbs;
 use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\MetadataRepository;
@@ -11,6 +13,7 @@ use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\SchemaProvider;
 use Duxbo\Seo\Contracts\Seoable;
 use Duxbo\Seo\Contracts\TokenResolver;
+use Duxbo\Seo\Data\AnalysisReport;
 use Duxbo\Seo\Data\SchemaGraph;
 use Duxbo\Seo\Data\SeoContext;
 use Duxbo\Seo\Data\SeoData;
@@ -37,6 +40,7 @@ final class Seo
         private readonly LocaleResolver $locales,
         private readonly GraphAssembler $assembler,
         private readonly SchemaValidator $validator,
+        private readonly Analyzer $analyzer,
     ) {
     }
 
@@ -201,6 +205,58 @@ final class Seo
     public function graph(): GraphAssembler
     {
         return $this->assembler;
+    }
+
+    /**
+     * Score a page's content.
+     */
+    public function analyze(
+        string $content,
+        ?string $keyword = null,
+        ?string $title = null,
+        ?string $description = null,
+        ?string $url = null,
+        ?string $locale = null,
+    ): AnalysisReport {
+        return $this->analyzer->analyze($content, $keyword, $title, $description, $url, $locale);
+    }
+
+    /**
+     * Score a record, taking title, description and keyword from its resolved
+     * metadata so the analysis matches what will actually be published.
+     */
+    public function analyzeModel(Seoable $model, string $content, ?string $locale = null): AnalysisReport
+    {
+        return $this->analyzer->analyzeContext($this->context($model, $locale), $content);
+    }
+
+    /**
+     * @param  class-string<AnalysisCheck>|AnalysisCheck  $check
+     */
+    public function registerCheck(string|AnalysisCheck $check): self
+    {
+        $this->analyzer->register($check);
+
+        return $this;
+    }
+
+    public function removeCheck(string $id): self
+    {
+        $this->analyzer->remove($id);
+
+        return $this;
+    }
+
+    public function setCheckWeight(string $id, int $weight): self
+    {
+        $this->analyzer->setWeight($id, $weight);
+
+        return $this;
+    }
+
+    public function analyzer(): Analyzer
+    {
+        return $this->analyzer;
     }
 
     public function registerFormatter(OutputFormatter $formatter): self

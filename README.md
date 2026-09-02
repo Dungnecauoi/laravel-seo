@@ -69,16 +69,80 @@ a price belongs inside an `Offer`, an FAQ answer is its own node.
 `Seo::validateSchema($post)` lists what Google would silently drop the rich
 result over.
 
+### Sitemaps and robots.txt
+
+Sources are opt-in, one at a time — nothing is discovered, because auto-
+registering every model with the trait would push drafts and soft-deleted rows
+onto a public sitemap.
+
+```php
+'sitemap' => ['sources' => [
+    ['model' => Post::class, 'name' => 'posts', 'scope' => fn ($q) => $q->published()],
+    ['pages' => ['/', '/gioi-thieu', '/lien-he']],
+]],
+```
+
+`/sitemap.xml` and `/robots.txt` serve themselves. Large sites run
+`php artisan seo:sitemap` to write static files instead. Sources stream with
+`lazyById()` and are written with `XMLWriter`, so a million-row table costs
+constant memory.
+
+### Redirects and the 404 monitor
+
+```php
+app(RedirectRepository::class)->create('/cu', '/moi');
+app(RedirectRepository::class)->create('/blog', '/tin-tuc', type: RedirectMatchType::Prefix);
+```
+
+Rules are consulted only once a request has already 404ed, so live routes are
+never shadowed and the common path costs nothing. Three checks run at write
+time and cannot be switched off: off-site targets, catastrophic regex patterns,
+and redirect loops.
+
+### Content analysis
+
+```php
+$report = Seo::analyze($html, keyword: 'tối ưu SEO', locale: 'vi');
+$report->score;      // 0-100
+$report->problems(); // failures and warnings only
+```
+
+Checks declare which locales they understand. Flesch and its descendants count
+syllables the way English spells them, so they sit out on Vietnamese content
+rather than producing a confident number that means nothing. In their place:
+sentence length in syllables, `được`/`bị` passive markers, and keyword matching
+that normalises Unicode first — "tiếng" has two spellings that look identical
+and would not otherwise compare equal.
+
+### Headless
+
+```php
+'api' => ['enabled' => true, 'models' => ['post']],
+```
+
+```ts
+// app/page.tsx — nothing to map by hand
+export async function generateMetadata({ params }) {
+  const r = await fetch(`${API}/api/seo/v1/resolve?url=${params.slug}&format=next`)
+  return r.json()
+}
+```
+
+Formatters: `html`, `array`, `jsonld`, `next`, `nuxt`, `vue`. The API is
+disabled by default and its Gate denies everyone until the application defines
+it — an SEO panel can rewrite every title on a site, so forgetting to configure
+it must lock the door rather than open it.
+
 | Milestone | Scope | State |
 |---|---|---|
 | M1 | Contracts, data objects, Compat | done |
 | M2 | Storage, `HasSeo` trait, resolution pipeline, HTML output | done |
 | M3 | schema.org `@graph` | done |
-| M4 | Sitemap, robots.txt | |
-| M5 | Redirects, 404 monitor | |
-| M6 | HTTP API, headless formatters | |
-| M7 | Content analysis | |
-| M8 | AI drivers | |
+| M4 | Sitemap, robots.txt | done |
+| M5 | Redirects, 404 monitor | done |
+| M6 | HTTP API, headless formatters | done |
+| M7 | Content analysis | done |
+| M8 | AI drivers | next |
 | M9 | `@duxbo/seo-core` npm package | |
 | M10 | Docs, full CI matrix, 1.0 | |
 

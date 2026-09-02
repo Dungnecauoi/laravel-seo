@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo;
 
+use Closure;
+use Duxbo\Seo\Analysis\Analyzer;
+use Duxbo\Seo\Analysis\DomContentExtractor;
+use Duxbo\Seo\Console\PruneNotFoundCommand;
+use Duxbo\Seo\Console\SitemapCommand;
+use Duxbo\Seo\Contracts\ContentExtractor;
 use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\MetadataRepository;
+use Duxbo\Seo\Contracts\RedirectMatcher;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Formatters\ArrayFormatter;
+use Duxbo\Seo\Formatters\HeadFormatter;
 use Duxbo\Seo\Formatters\HtmlFormatter;
 use Duxbo\Seo\Formatters\JsonLdFormatter;
+use Duxbo\Seo\Formatters\NextMetadataFormatter;
+use Duxbo\Seo\Http\Middleware\HandleNotFound;
 use Duxbo\Seo\Locale\AppLocaleResolver;
+use Duxbo\Seo\Redirects\CachedRedirectMatcher;
 use Duxbo\Seo\Resolution\Resolver;
 use Duxbo\Seo\Resolution\TokenExpander;
 use Duxbo\Seo\Resolution\Tokens\AttributeToken;
@@ -21,12 +32,16 @@ use Duxbo\Seo\Resolution\Tokens\NowToken;
 use Duxbo\Seo\Schema\GraphAssembler;
 use Duxbo\Seo\Schema\SchemaNormalizer;
 use Duxbo\Seo\Schema\SchemaValidator;
+use Duxbo\Seo\Sitemap\SitemapGenerator;
+use Duxbo\Seo\Sitemap\Sources\ModelSource;
+use Duxbo\Seo\Sitemap\Sources\RouteSource;
 use Duxbo\Seo\Storage\EloquentMetadataRepository;
-use Duxbo\Seo\Storage\SeoDataMapper;
 use Duxbo\Seo\Support\Compat;
 use Duxbo\Seo\Url\ConfigUrlGenerator;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -42,63 +57,26 @@ final class SeoServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom($this->configPath(), 'seo');
 
-        $this->app->singleton(SeoDataMapper::class);
+        $this->app->singleton(Storage\SeoDataMapper::class);
+        $this->app->singleton(SchemaNormalizer::class);
+        $this->app->singleton(SchemaValidator::class);
+        $this->app->singleton(Redirects\RedirectGuard::class);
+        $this->app->singleton(NotFound\NotFoundLogger::class);
+        $this->app->singleton(Robots\RobotsTxt::class);
 
         // Contracts, not concretes: every one of these is meant to be swapped.
         $this->app->singleton(LocaleResolver::class, AppLocaleResolver::class);
         $this->app->singleton(UrlGenerator::class, ConfigUrlGenerator::class);
         $this->app->singleton(MetadataRepository::class, EloquentMetadataRepository::class);
+        $this->app->singleton(ContentExtractor::class, DomContentExtractor::class);
+        $this->app->singleton(RedirectMatcher::class, CachedRedirectMatcher::class);
 
-        $this->app->singleton(TokenExpander::class, function ($app): TokenExpander {
-            $expander = new TokenExpander($app->make(Config::class));
-
-            foreach ($this->defaultTokens($app->make(Config::class)) as $token) {
-                $expander->register($token);
-            }
-
-            return $expander;
-        });
-
-        $this->app->singleton(Resolver::class, function ($app): Resolver {
-            /** @var list<class-string<\Duxbo\Seo\Contracts\ResolverStage>> $stages */
-            $stages = $app->make(Config::class)->get('seo.pipeline', []);
-
-            return new Resolver($app, $stages);
-        });
-
-        $this->app->singleton(GraphAssembler::class, function ($app): GraphAssembler {
-            $assembler = new GraphAssembler($app, $app->make(SchemaNormalizer::class));
-
-            if ($app->make(Config::class)->get('seo.schema.enabled', true) !== true) {
-                return $assembler;
-            }
-
-            /** @var list<class-string<\Duxbo\Seo\Contracts\SchemaProvider>> $providers */
-            $providers = $app->make(Config::class)->get('seo.schema.providers', []);
-
-            foreach ($providers as $provider) {
-                $assembler->register($provider);
-            }
-
-            return $assembler;
-        });
-
-        $this->app->singleton(Seo::class, function ($app): Seo {
-            $seo = new Seo(
-                $app->make(Resolver::class),
-                $app->make(TokenExpander::class),
-                $app->make(MetadataRepository::class),
-                $app->make(LocaleResolver::class),
-                $app->make(GraphAssembler::class),
-                $app->make(SchemaValidator::class),
-            );
-
-            $seo->registerFormatter($app->make(HtmlFormatter::class));
-            $seo->registerFormatter($app->make(ArrayFormatter::class));
-            $seo->registerFormatter($app->make(JsonLdFormatter::class));
-
-            return $seo;
-        });
+        $this->registerTokens();
+        $this->registerResolver();
+        $this->registerSchema();
+        $this->registerSitemap();
+        $this->registerAnalyzer();
+        $this->registerManager();
     }
 
     public function boot(): void
@@ -108,14 +86,284 @@ final class SeoServiceProvider extends ServiceProvider
         Compat::assertSupported();
 
         $this->registerBladeDirective();
+        $this->registerGate();
+        $this->registerRoutes();
+        $this->registerMiddleware();
+
+        // Check messages are translation keys, not sentences, so a panel can
+        // render either language without the check knowing which.
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'seo');
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 $this->configPath() => config_path('seo.php'),
             ], 'seo-config');
 
+            $this->publishes([
+                __DIR__.'/../lang' => $this->app->langPath('vendor/seo'),
+            ], 'seo-lang');
+
             $this->publishMigrations();
+
+            $this->commands([
+                SitemapCommand::class,
+                PruneNotFoundCommand::class,
+            ]);
         }
+    }
+
+    private function registerTokens(): void
+    {
+        $this->app->singleton(TokenExpander::class, function ($app): TokenExpander {
+            $config = $app->make(Config::class);
+            $expander = new TokenExpander($config);
+
+            foreach ([
+                new ConfigToken('sitename', 'seo.site_name', $config),
+                new ConfigToken('sep', 'seo.separator', $config),
+
+                new AttributeToken('title', ['title', 'name', 'heading', 'label']),
+                new AttributeToken('excerpt', ['excerpt', 'summary', 'description']),
+                new AttributeToken('description', ['description', 'excerpt', 'summary']),
+                new AttributeToken('author', ['author_name', 'author']),
+                new AttributeToken('category', ['category', 'categories', 'category_name']),
+                new AttributeToken('tag', ['tag', 'tags']),
+                new AttributeToken('parent_title', ['parent_title']),
+
+                new DateToken('date', ['published_at', 'created_at'], $config),
+                new DateToken('modified', ['updated_at'], $config),
+
+                new NowToken('currentyear', 'Y'),
+                new NowToken('currentdate', 'd/m/Y'),
+
+                new FieldToken(),
+            ] as $token) {
+                $expander->register($token);
+            }
+
+            return $expander;
+        });
+    }
+
+    private function registerResolver(): void
+    {
+        $this->app->singleton(Resolver::class, function ($app): Resolver {
+            /** @var list<class-string<Contracts\ResolverStage>> $stages */
+            $stages = $app->make(Config::class)->get('seo.pipeline', []);
+
+            return new Resolver($app, $stages);
+        });
+    }
+
+    private function registerSchema(): void
+    {
+        $this->app->singleton(GraphAssembler::class, function ($app): GraphAssembler {
+            $config = $app->make(Config::class);
+            $assembler = new GraphAssembler($app, $app->make(SchemaNormalizer::class));
+
+            if ($config->get('seo.schema.enabled', true) !== true) {
+                return $assembler;
+            }
+
+            /** @var list<class-string<Contracts\SchemaProvider>> $providers */
+            $providers = $config->get('seo.schema.providers', []);
+
+            foreach ($providers as $provider) {
+                $assembler->register($provider);
+            }
+
+            return $assembler;
+        });
+    }
+
+    private function registerSitemap(): void
+    {
+        $this->app->singleton(SitemapGenerator::class, function ($app): SitemapGenerator {
+            $config = $app->make(Config::class);
+
+            $generator = new SitemapGenerator(
+                $config,
+                $app->make(UrlGenerator::class),
+                $app->make('events'),
+            );
+
+            /** @var list<array<string, mixed>> $sources */
+            $sources = $config->get('seo.sitemap.sources', []);
+
+            foreach ($sources as $definition) {
+                $source = $this->makeSitemapSource($definition, $app);
+
+                if ($source !== null) {
+                    $generator->register($source);
+                }
+            }
+
+            return $generator;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $definition
+     */
+    private function makeSitemapSource(array $definition, \Illuminate\Contracts\Container\Container $app): ?Contracts\SitemapSource
+    {
+        if (isset($definition['pages']) && is_array($definition['pages'])) {
+            /** @var list<string|array<string, mixed>> $pages */
+            $pages = $definition['pages'];
+
+            return new RouteSource(
+                entries: $pages,
+                urls: $app->make(UrlGenerator::class),
+                name: is_string($definition['name'] ?? null) ? $definition['name'] : 'pages',
+            );
+        }
+
+        $model = $definition['model'] ?? null;
+
+        if (! is_string($model) || ! class_exists($model)) {
+            return null;
+        }
+
+        $frequency = $definition['changefreq'] ?? null;
+
+        return new ModelSource(
+            model: $model,
+            name: is_string($definition['name'] ?? null)
+                ? $definition['name']
+                : strtolower(class_basename($model)).'s',
+            urls: $app->make(UrlGenerator::class),
+            locales: $app->make(LocaleResolver::class),
+            scope: ($definition['scope'] ?? null) instanceof Closure ? $definition['scope'] : null,
+            changeFrequency: is_string($frequency) ? Enums\ChangeFrequency::tryFrom($frequency) : null,
+            priority: isset($definition['priority']) ? (float) $definition['priority'] : null,
+            enabled: ($definition['enabled'] ?? true) === true,
+        );
+    }
+
+    private function registerAnalyzer(): void
+    {
+        $this->app->singleton(Analyzer::class, function ($app): Analyzer {
+            $config = $app->make(Config::class);
+
+            $analyzer = new Analyzer(
+                $app,
+                $app->make(ContentExtractor::class),
+                $config,
+                $app->make('events'),
+            );
+
+            /** @var list<class-string<Contracts\AnalysisCheck>> $checks */
+            $checks = $config->get('seo.analysis.checks', []);
+
+            foreach ($checks as $check) {
+                $analyzer->register($check);
+            }
+
+            /** @var array<string, int> $weights */
+            $weights = $config->get('seo.analysis.weights', []);
+
+            foreach ($weights as $id => $weight) {
+                $analyzer->setWeight($id, (int) $weight);
+            }
+
+            return $analyzer;
+        });
+    }
+
+    private function registerManager(): void
+    {
+        $this->app->singleton(Seo::class, function ($app): Seo {
+            $seo = new Seo(
+                $app->make(Resolver::class),
+                $app->make(TokenExpander::class),
+                $app->make(MetadataRepository::class),
+                $app->make(LocaleResolver::class),
+                $app->make(GraphAssembler::class),
+                $app->make(SchemaValidator::class),
+                $app->make(Analyzer::class),
+            );
+
+            $head = $app->make(HeadFormatter::class);
+
+            foreach ([
+                $app->make(HtmlFormatter::class),
+                $app->make(ArrayFormatter::class),
+                $app->make(JsonLdFormatter::class),
+                $app->make(NextMetadataFormatter::class),
+                // Nuxt 3 is built on Unhead, so one formatter serves both — it
+                // is registered twice so a front end asks for its own word.
+                $head->withName('nuxt'),
+                $head->withName('vue'),
+            ] as $formatter) {
+                $seo->registerFormatter($formatter);
+            }
+
+            return $seo;
+        });
+    }
+
+    private function registerRoutes(): void
+    {
+        if ($this->app->routesAreCached()) {
+            return;
+        }
+
+        $this->loadRoutesFrom(__DIR__.'/../routes/seo.php');
+
+        if ($this->app->make(Config::class)->get('seo.api.enabled', false) === true) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+        }
+    }
+
+    /**
+     * Deny by default.
+     *
+     * An SEO panel can rewrite every title on a site and redirect any URL, so
+     * forgetting to define this Gate must lock the door rather than open it.
+     * The application overrides it with its own definition.
+     */
+    private function registerGate(): void
+    {
+        if (! Gate::has('viewSeoPanel')) {
+            Gate::define('viewSeoPanel', static fn (mixed $user = null): bool => false);
+        }
+    }
+
+    /**
+     * Pushed onto the global stack so a 404 from any route reaches it.
+     *
+     * Registered through the kernel rather than the application's own middleware
+     * file, which moved in Laravel 11 — this call works on every supported
+     * version.
+     */
+    private function registerMiddleware(): void
+    {
+        $enabled = $this->app->make(Config::class);
+
+        if ($enabled->get('seo.redirects.enabled', true) !== true
+            && $enabled->get('seo.not_found.enabled', true) !== true) {
+            return;
+        }
+
+        if (! $this->app->bound(Kernel::class)) {
+            return;
+        }
+
+        $kernel = $this->app->make(Kernel::class);
+
+        if (method_exists($kernel, 'pushMiddleware')) {
+            $kernel->pushMiddleware(HandleNotFound::class);
+        }
+    }
+
+    /**
+     * `@seo` renders the meta tags for the current page.
+     */
+    private function registerBladeDirective(): void
+    {
+        Blade::directive('seo', static function (string $expression): string {
+            return "<?php echo app(\\Duxbo\\Seo\\Seo::class)->render({$expression}); ?>";
+        });
     }
 
     /**
@@ -137,43 +385,6 @@ final class SeoServiceProvider extends ServiceProvider
         if ($paths !== []) {
             $this->publishes($paths, 'seo-migrations');
         }
-    }
-
-    /**
-     * `@seo` renders the meta tags for the current page.
-     */
-    private function registerBladeDirective(): void
-    {
-        Blade::directive('seo', static function (string $expression): string {
-            return "<?php echo app(\\Duxbo\\Seo\\Seo::class)->render({$expression}); ?>";
-        });
-    }
-
-    /**
-     * @return list<\Duxbo\Seo\Contracts\TokenResolver>
-     */
-    private function defaultTokens(Config $config): array
-    {
-        return [
-            new ConfigToken('sitename', 'seo.site_name', $config),
-            new ConfigToken('sep', 'seo.separator', $config),
-
-            new AttributeToken('title', ['title', 'name', 'heading', 'label']),
-            new AttributeToken('excerpt', ['excerpt', 'summary', 'description']),
-            new AttributeToken('description', ['description', 'excerpt', 'summary']),
-            new AttributeToken('author', ['author_name', 'author']),
-            new AttributeToken('category', ['category', 'categories', 'category_name']),
-            new AttributeToken('tag', ['tag', 'tags']),
-            new AttributeToken('parent_title', ['parent_title']),
-
-            new DateToken('date', ['published_at', 'created_at'], $config),
-            new DateToken('modified', ['updated_at'], $config),
-
-            new NowToken('currentyear', 'Y'),
-            new NowToken('currentdate', 'd/m/Y'),
-
-            new FieldToken(),
-        ];
     }
 
     private function configPath(): string
