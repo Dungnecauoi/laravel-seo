@@ -41,7 +41,10 @@
         "laravel": {
             "providers": [
                 "Duxbo\\Seo\\SeoServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "Seo": "Duxbo\\Seo\\Facades\\Seo"
+            }
         },
         "branch-alias": {
             "dev-main": "1.x-dev"

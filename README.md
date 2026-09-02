@@ -12,14 +12,41 @@ stops maintaining.
 
 ## Status
 
-Under construction. Milestone **M1 of 10** is complete: contracts, immutable
-data objects, and the compatibility layer. There is no user-facing behaviour
-yet — that arrives with M2.
+Under construction, but **usable from M2 onward**: add the trait to a model and
+meta tags render, with a fallback chain behind them.
+
+```php
+class Post extends Model implements Seoable
+{
+    use HasSeo;
+
+    protected array $seoMap = [
+        'title'       => 'name',
+        'description' => 'excerpt',
+        'og.image'    => 'cover_url',
+    ];
+}
+```
+
+```blade
+{{-- in your layout --}}
+{!! $post->seoTags() !!}
+```
+
+Nothing stored? The mapping above answers. No mapping? The per-model template
+does. No template? The site default. Store a value later and it wins, without
+anything else changing.
+
+Load a whole index page without a query per record:
+
+```php
+$posts = Post::query()->withSeo()->paginate();
+```
 
 | Milestone | Scope | State |
 |---|---|---|
 | M1 | Contracts, data objects, Compat | done |
-| M2 | Storage, `HasSeo` trait, resolution pipeline, HTML output | next |
+| M2 | Storage, `HasSeo` trait, resolution pipeline, HTML output | done |
 | M3 | schema.org `@graph` | |
 | M4 | Sitemap, robots.txt | |
 | M5 | Redirects, 404 monitor | |

@@ -8,7 +8,6 @@ use Closure;
 use Duxbo\Seo\Exceptions\UnsupportedLaravelVersionException;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Support\ServiceProvider;
 
 /**
  * Every difference between Laravel 9 and 13 lives here.
@@ -80,22 +79,29 @@ final class Compat
     }
 
     /**
-     * Publish migrations, using the framework helper where it exists.
+     * Whether the framework can stamp migration timestamps on publish itself.
      *
-     * `publishesMigrations()` arrived in Laravel 11 and stamps each file with a
-     * fresh timestamp on publish. Before that the provider has to do the
-     * stamping itself, or repeated publishes collide.
+     * `publishesMigrations()` arrived in Laravel 11. It is protected on
+     * ServiceProvider, so the provider has to make the call — this method
+     * carries the version knowledge, and the provider carries the access.
+     */
+    public static function stampsMigrationsOnPublish(): bool
+    {
+        return self::atLeast(11);
+    }
+
+    /**
+     * Publish paths for migrations, timestamped here.
+     *
+     * Only needed before Laravel 11. Without a fresh timestamp per file,
+     * publishing twice writes the same filename and the second migration is
+     * silently ignored.
      *
      * @param  string  $from  Directory holding the package's migration stubs.
+     * @return array<string, string>
      */
-    public static function publishMigrations(ServiceProvider $provider, string $from, string $group = 'seo-migrations'): void
+    public static function stampedMigrationMap(string $from): array
     {
-        if (self::atLeast(11) && method_exists($provider, 'publishesMigrations')) {
-            $provider->publishesMigrations([$from => database_path('migrations')], $group);
-
-            return;
-        }
-
         $paths = [];
         $offset = 0;
 
@@ -106,9 +112,7 @@ final class Compat
             $paths[$stub] = database_path("migrations/{$timestamp}_{$name}.php");
         }
 
-        if ($paths !== []) {
-            $provider->publishes($paths, $group);
-        }
+        return $paths;
     }
 
     /**
