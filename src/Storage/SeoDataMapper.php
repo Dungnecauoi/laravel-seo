@@ -123,6 +123,14 @@ final class SeoDataMapper
                 self::arr($stored['alternateLocales'] ?? null),
                 'is_string',
             )),
+            publishedTime: self::str($stored['publishedTime'] ?? null),
+            modifiedTime: self::str($stored['modifiedTime'] ?? null),
+            author: self::str($stored['author'] ?? null),
+            section: self::str($stored['section'] ?? null),
+            tags: array_values(array_filter(
+                self::arr($stored['tags'] ?? null),
+                'is_string',
+            )),
         );
     }
 

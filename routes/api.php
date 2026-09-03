@@ -26,7 +26,12 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
     ->middleware(config('seo.api.middleware', ['api', 'can:viewSeoPanel']))
     ->group(static function (): void {
         Route::get('resolve', ResolveController::class);
-        Route::post('analyze', AnalyzeController::class);
+
+        // Real CPU work per request with no cost control the way the AI
+        // budget has one — a buggy or malicious authenticated client could
+        // otherwise hammer it.
+        Route::post('analyze', AnalyzeController::class)
+            ->middleware('throttle:'.config('seo.analysis.rate_limit', '30,1'));
 
         Route::get('meta/{type}/{id}', [MetaController::class, 'show']);
         Route::put('meta/{type}/{id}', [MetaController::class, 'update']);

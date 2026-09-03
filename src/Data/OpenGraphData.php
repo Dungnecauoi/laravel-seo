@@ -15,6 +15,11 @@ final class OpenGraphData
 
     /**
      * @param  list<string>  $alternateLocales  Other locales this page exists in.
+     * @param  string|null  $publishedTime  ISO 8601. `article:published_time` — only meaningful when `type` is 'article'.
+     * @param  string|null  $modifiedTime  ISO 8601. `article:modified_time`.
+     * @param  string|null  $author  `article:author` — a profile URL per the OG spec, though most consumers accept a plain name.
+     * @param  string|null  $section  `article:section` — the category this content sits under.
+     * @param  list<string>  $tags  `article:tag`, repeated once per entry.
      */
     public function __construct(
         public readonly ?string $title = null,
@@ -28,6 +33,11 @@ final class OpenGraphData
         public readonly ?string $siteName = null,
         public readonly ?string $locale = null,
         public readonly array $alternateLocales = [],
+        public readonly ?string $publishedTime = null,
+        public readonly ?string $modifiedTime = null,
+        public readonly ?string $author = null,
+        public readonly ?string $section = null,
+        public readonly array $tags = [],
     ) {
     }
 
@@ -38,6 +48,11 @@ final class OpenGraphData
             && $this->image === null
             && $this->type === null
             && $this->url === null;
+    }
+
+    public function isArticle(): bool
+    {
+        return $this->type === 'article';
     }
 
     /**
@@ -57,6 +72,11 @@ final class OpenGraphData
             'siteName' => $this->siteName,
             'locale' => $this->locale,
             'alternateLocales' => $this->alternateLocales,
+            'publishedTime' => $this->publishedTime,
+            'modifiedTime' => $this->modifiedTime,
+            'author' => $this->author,
+            'section' => $this->section,
+            'tags' => $this->tags,
         ];
     }
 

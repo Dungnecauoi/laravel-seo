@@ -173,6 +173,31 @@ final class HtmlFormatter implements OutputFormatter
             $lines[] = self::meta('property', 'og:locale:alternate', $alternate);
         }
 
+        // article:* belongs only under og:type=article — emitting it on a
+        // 'website' page is meaningless per the Open Graph spec, and
+        // Facebook's own parser ignores it there regardless.
+        if ($og !== null && $og->isArticle()) {
+            if ($og->publishedTime !== null) {
+                $lines[] = self::meta('property', 'article:published_time', $og->publishedTime);
+            }
+
+            if ($og->modifiedTime !== null) {
+                $lines[] = self::meta('property', 'article:modified_time', $og->modifiedTime);
+            }
+
+            if ($og->author !== null) {
+                $lines[] = self::meta('property', 'article:author', $og->author);
+            }
+
+            if ($og->section !== null) {
+                $lines[] = self::meta('property', 'article:section', $og->section);
+            }
+
+            foreach ($og->tags as $tag) {
+                $lines[] = self::meta('property', 'article:tag', $tag);
+            }
+        }
+
         return $lines;
     }
 

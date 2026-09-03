@@ -71,6 +71,15 @@ final class NextMetadataFormatter implements OutputFormatter
                 'width' => $og->imageWidth,
                 'height' => $og->imageHeight,
             ], static fn (mixed $v): bool => $v !== null)] : null,
+            // Next's Metadata API only recognises these under type: 'article',
+            // matching the Open Graph spec's own article:* namespace.
+            ...($og !== null && $og->isArticle() ? array_filter([
+                'publishedTime' => $og->publishedTime,
+                'modifiedTime' => $og->modifiedTime,
+                'authors' => $og->author !== null ? [$og->author] : null,
+                'section' => $og->section,
+                'tags' => $og->tags !== [] ? $og->tags : null,
+            ], static fn (mixed $v): bool => $v !== null) : []),
         ], static fn (mixed $v): bool => $v !== null);
 
         if ($twitter !== null && ! $twitter->isEmpty()) {

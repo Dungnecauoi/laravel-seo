@@ -525,6 +525,16 @@ return [
 
         // 'keyword-density' => 5
         'weights' => [],
+
+        /*
+        | Analysis runs real work per request — DOMDocument parsing plus every
+        | check above — with no cost control the way the AI budget has one.
+        | Both the REST API and the Blade panel's own /analyze route already
+        | sit behind the viewSeoPanel Gate, so this is defense in depth against
+        | a buggy or malicious authenticated client hammering it, not a public
+        | surface. Laravel's throttle middleware syntax: "attempts,minutes".
+        */
+        'rate_limit' => '30,1',
     ],
 
 ];

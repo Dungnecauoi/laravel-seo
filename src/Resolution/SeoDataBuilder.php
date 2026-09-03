@@ -116,6 +116,11 @@ final class SeoDataBuilder
             siteName: self::str($values['siteName'] ?? $values['site_name'] ?? null),
             locale: self::str($values['locale'] ?? null),
             alternateLocales: self::strings($values['alternateLocales'] ?? null),
+            publishedTime: self::str($values['publishedTime'] ?? $values['published_time'] ?? null),
+            modifiedTime: self::str($values['modifiedTime'] ?? $values['modified_time'] ?? null),
+            author: self::str($values['author'] ?? null),
+            section: self::str($values['section'] ?? null),
+            tags: self::strings($values['tags'] ?? null),
         );
     }
 

@@ -82,6 +82,26 @@ final class HeadFormatter implements OutputFormatter
             }
         }
 
+        // article:* belongs only under og:type=article — emitting it on a
+        // 'website' page is meaningless per the Open Graph spec, and
+        // Facebook's own parser ignores it there regardless.
+        if ($og !== null && $og->isArticle()) {
+            foreach ([
+                'article:published_time' => $og->publishedTime,
+                'article:modified_time' => $og->modifiedTime,
+                'article:author' => $og->author,
+                'article:section' => $og->section,
+            ] as $property => $value) {
+                if ($value !== null) {
+                    $meta[] = ['property' => $property, 'content' => $value];
+                }
+            }
+
+            foreach ($og->tags as $tag) {
+                $meta[] = ['property' => 'article:tag', 'content' => $tag];
+            }
+        }
+
         if ($twitter !== null && ! $twitter->isEmpty()) {
             foreach ([
                 'twitter:card' => $twitter->card?->value,

@@ -6,7 +6,7 @@ namespace Duxbo\Seo\Redirects;
 
 use Duxbo\Seo\Enums\RedirectMatchType;
 use Duxbo\Seo\Exceptions\UnsafeRedirect;
-use Illuminate\Contracts\Config\Repository as Config;
+use Duxbo\Seo\Support\SameOriginUrls;
 
 /**
  * Refuses to store a rule that would be dangerous or broken.
@@ -17,7 +17,7 @@ use Illuminate\Contracts\Config\Repository as Config;
  */
 final class RedirectGuard
 {
-    public function __construct(private readonly Config $config)
+    public function __construct(private readonly SameOriginUrls $sameOrigin)
     {
     }
 
@@ -46,8 +46,8 @@ final class RedirectGuard
             throw UnsafeRedirect::unparseable($target);
         }
 
-        if (! in_array(strtolower($host), $this->allowedHosts(), true)) {
-            throw UnsafeRedirect::hostNotAllowed($host, $this->allowedHosts());
+        if (! $this->sameOrigin->isAllowed($target)) {
+            throw UnsafeRedirect::hostNotAllowed($host, $this->sameOrigin->allowedHosts());
         }
     }
 
@@ -145,31 +145,12 @@ final class RedirectGuard
         $host = parse_url($target, PHP_URL_HOST);
 
         // An off-site target ends the chain; it cannot loop back here.
-        if (is_string($host) && ! in_array(strtolower($host), $this->allowedHosts(), true)) {
+        if (is_string($host) && ! $this->sameOrigin->isAllowed($target)) {
             return null;
         }
 
         $path = parse_url($target, PHP_URL_PATH);
 
         return is_string($path) ? $path : null;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function allowedHosts(): array
-    {
-        /** @var list<string> $configured */
-        $configured = $this->config->get('seo.redirects.allowed_hosts', []);
-
-        $appHost = parse_url((string) $this->config->get('app.url'), PHP_URL_HOST);
-
-        $hosts = array_map('strtolower', $configured);
-
-        if (is_string($appHost) && $appHost !== '') {
-            $hosts[] = strtolower($appHost);
-        }
-
-        return array_values(array_unique($hosts));
     }
 }

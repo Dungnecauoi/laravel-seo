@@ -42,6 +42,44 @@ find. `Contracts/` is frozen at 1.0, so it stays open until then.
   `web` middleware (session + CSRF) rather than the token-based REST API, since
   a same-origin admin page already has both.
 
+### Added / Fixed — second core audit
+
+- **Canonical URLs pointed at another domain were accepted with zero
+  validation**, through both the REST API and the Blade panel. A canonical
+  set to an outside URL tells search engines this page's real home is
+  elsewhere and can pull it out of the index — the same class of mistake as
+  an open redirect, just quieter, and this package already treats an
+  unrestricted redirect target as a real vulnerability rather than a
+  preference. Fixed by extracting the host-allowlist check `RedirectGuard`
+  already had into a shared `SameOriginUrls`, now also enforced on the
+  `canonical` field in both write endpoints. `seo.redirects.allowed_hosts`
+  is the one list both surfaces read.
+- **`/analyze` had no rate limit**, unlike the AI path which has a token
+  budget. Content analysis parses HTML and runs every registered check per
+  request; a buggy or malicious authenticated client could hammer it since
+  both routes sit behind `viewSeoPanel` but nothing capped call volume.
+  Added `seo.analysis.rate_limit` (default `30,1`), applied via Laravel's
+  `throttle` middleware to both the API and panel `/analyze` routes.
+- **Added `og:article:*` support** — `publishedTime`, `modifiedTime`,
+  `author`, `section`, `tag`, emitted only under `og.type = 'article'` per
+  the Open Graph spec. A content site's link previews on Facebook and
+  LinkedIn were missing byline and publish-date decoration that every real
+  article page benefits from. Wired through `OpenGraphData`,
+  `SeoDataBuilder`, `SeoDataMapper` (so it survives a save/load round trip),
+  and all three formatters that emit Open Graph — `HtmlFormatter`,
+  `HeadFormatter`, and `NextMetadataFormatter` (nested under Next's own
+  `authors`/`tags` shape).
+
+Confirmed safe rather than assumed: `DomContentExtractor`'s `DOMDocument`
+usage was checked against an actual XXE payload:
+
+```php
+$d->loadHTML('<?xml encoding="UTF-8"><div>' . $maliciousXml . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+```
+
+does not resolve external entities on the PHP versions this package
+supports — no change needed, but asserted rather than taken on faith.
+
 ### Added — demo-domain master switch
 
 `SEO_ENABLED=false` forces `noindex,nofollow` on every page — unconditionally,

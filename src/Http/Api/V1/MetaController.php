@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Http\Api\V1;
 
 use Duxbo\Seo\Seo;
+use Duxbo\Seo\Support\SameOriginUrls;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class MetaController extends ApiController
 {
-    public function __construct(private readonly Seo $seo)
-    {
+    public function __construct(
+        private readonly Seo $seo,
+        private readonly SameOriginUrls $sameOrigin,
+    ) {
     }
 
     public function show(Request $request, string $type, string $id): JsonResponse
@@ -35,7 +38,15 @@ final class MetaController extends ApiController
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:500'],
-            'canonical' => ['nullable', 'string', 'max:2048'],
+            'canonical' => ['nullable', 'string', 'max:2048', function (string $attribute, mixed $value, \Closure $fail): void {
+                // A canonical pointed off-site tells search engines this
+                // page's real home is elsewhere, and can pull it out of the
+                // index entirely — the same class of mistake as an open
+                // redirect, just quieter.
+                if (is_string($value) && $value !== '' && ! $this->sameOrigin->isAllowed($value)) {
+                    $fail('The canonical URL must be a path, or a URL on an allowed host.');
+                }
+            }],
             'robots' => ['nullable', 'array'],
             'robots.*' => ['string', 'max:40'],
             'focusKeyword' => ['nullable', 'string', 'max:191'],

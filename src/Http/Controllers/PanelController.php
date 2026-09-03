@@ -6,6 +6,7 @@ namespace Duxbo\Seo\Http\Controllers;
 
 use Duxbo\Seo\Http\Concerns\ResolvesExposedModel;
 use Duxbo\Seo\Seo;
+use Duxbo\Seo\Support\SameOriginUrls;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,8 +26,10 @@ final class PanelController
 {
     use ResolvesExposedModel;
 
-    public function __construct(private readonly Seo $seo)
-    {
+    public function __construct(
+        private readonly Seo $seo,
+        private readonly SameOriginUrls $sameOrigin,
+    ) {
     }
 
     public function show(Request $request, string $type, string $id): View
@@ -68,7 +71,15 @@ final class PanelController
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:500'],
-            'canonical' => ['nullable', 'string', 'max:2048'],
+            'canonical' => ['nullable', 'string', 'max:2048', function (string $attribute, mixed $value, \Closure $fail): void {
+                // A canonical pointed off-site tells search engines this
+                // page's real home is elsewhere, and can pull it out of the
+                // index entirely — the same class of mistake as an open
+                // redirect, just quieter.
+                if (is_string($value) && $value !== '' && ! $this->sameOrigin->isAllowed($value)) {
+                    $fail('The canonical URL must be a path, or a URL on an allowed host.');
+                }
+            }],
             'focusKeyword' => ['nullable', 'string', 'max:191'],
             'og' => ['nullable', 'array'],
             'og.image' => ['nullable', 'string', 'max:2048'],

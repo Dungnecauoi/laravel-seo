@@ -70,6 +70,7 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(Ai\AiManager::class);
         $this->app->singleton(SiteIndexability::class);
         $this->app->singleton(AlternateLocaleResolver::class);
+        $this->app->singleton(\Duxbo\Seo\Support\SameOriginUrls::class);
 
         // Contracts, not concretes: every one of these is meant to be swapped.
         $this->app->singleton(LocaleResolver::class, AppLocaleResolver::class);

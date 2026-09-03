@@ -47,6 +47,12 @@ Load a whole index page without a query per record:
 $posts = Post::query()->withSeo()->paginate();
 ```
 
+`og.type = 'article'` unlocks `article:published_time`, `article:modified_time`,
+`article:author`, `article:section` and `article:tag` — set via
+`'og.publishedTime' => …` alongside the rest of `$seoMap`. They render only
+under `article`; the Open Graph spec ties them to that type, and every real
+consumer (Facebook, LinkedIn) ignores them on a `website` page regardless.
+
 ### Demo domains — the master switch
 
 ```env
@@ -163,6 +169,14 @@ Rules are consulted only once a request has already 404ed, so live routes are
 never shadowed and the common path costs nothing. Three checks run at write
 time and cannot be switched off: off-site targets, catastrophic regex patterns,
 and redirect loops.
+
+The same off-site check guards a stored **canonical URL** through the API and
+the panel — a canonical pointed at another domain tells search engines this
+page's real home is elsewhere and can pull it out of the index entirely, the
+same class of mistake as an open redirect, just quieter. Add a host to
+`seo.redirects.allowed_hosts` to permit it deliberately; that list is shared
+between redirect targets and canonical URLs, since both are the same trust
+boundary.
 
 ### Content analysis
 
