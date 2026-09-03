@@ -73,6 +73,20 @@ a price belongs inside an `Offer`, an FAQ answer is its own node.
 `Seo::validateSchema($post)` lists what Google would silently drop the rich
 result over.
 
+Breadcrumbs are separate — implement `HasBreadcrumbs` when the model knows its
+own trail, since not every model does:
+
+```php
+public function seoBreadcrumbs(): array
+{
+    return [['Trang chủ' => '/'], ['name' => 'Tin tức', 'url' => '/tin-tuc'], $this->name];
+}
+```
+
+A product reached through two different category paths has two different
+trails, which a model alone cannot always resolve — set `breadcrumbs` on the
+`SeoContext` from the controller instead when that is the case.
+
 ### Sitemaps and robots.txt
 
 Sources are opt-in, one at a time — nothing is discovered, because auto-

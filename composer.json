@@ -21,6 +21,8 @@
         "ext-dom": "*",
         "ext-json": "*",
         "ext-libxml": "*",
+        "ext-mbstring": "*",
+        "ext-xmlwriter": "*",
         "illuminate/support": "^9.0|^10.0|^11.0|^12.0|^13.0",
         "illuminate/database": "^9.0|^10.0|^11.0|^12.0|^13.0",
         "illuminate/http": "^9.0|^10.0|^11.0|^12.0|^13.0",

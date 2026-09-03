@@ -42,6 +42,26 @@ find. `Contracts/` is frozen at 1.0, so it stays open until then.
   `web` middleware (session + CSRF) rather than the token-based REST API, since
   a same-origin admin page already has both.
 
+### Fixed — core audit
+
+A pass over the whole `src/` tree looking for what documentation claims and
+what code actually does had drifted apart, and for surfaces with no test
+coverage.
+
+- `composer.json` was missing `ext-mbstring` and `ext-xmlwriter` from
+  `require`, despite `mb_*` functions appearing in nine files and `XMLWriter`
+  driving the whole sitemap writer. Both extensions ship enabled by default in
+  virtually every PHP build, which is exactly why the gap went unnoticed —
+  but an extension the code calls belongs in the manifest regardless of how
+  likely it is to be present. The CI workflow's `extensions:` lists had the
+  same gap and are corrected alongside it.
+- `seo:sitemap` and `seo:prune-404` had zero test coverage — every other
+  public entry point (routes, the facade, the REST API) was exercised
+  somewhere, and the two Artisan commands were not. Added tests covering both
+  the success and failure paths of each.
+- `HasBreadcrumbs` existed, worked, and was tested (§3), but was never
+  mentioned in the README's structured-data section — documented now.
+
 ### Notes on supported versions
 
 The Composer constraint admits Laravel 9 through 13, but only 12 and 13 are
