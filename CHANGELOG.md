@@ -34,6 +34,13 @@ find. `Contracts/` is frozen at 1.0, so it stays open until then.
   and a daily token budget.
 - **`@duxbo/seo-core`** — the npm client: types, API client and the state
   handling every front end needs, with no rendering and no dependencies.
+- **UI, in three flavours, none required** — `@duxbo/seo-react` and
+  `@duxbo/seo-vue`, both a thin hook/composable over `@duxbo/seo-core` plus a
+  Tailwind-styled `<SeoPanel>`; and a Blade panel at `/seo/panel/{type}/{id}`
+  for a project with no front-end build step at all — plain `fetch()`, scoped
+  CSS, no Tailwind requirement. The Blade panel talks to its own routes under
+  `web` middleware (session + CSRF) rather than the token-based REST API, since
+  a same-origin admin page already has both.
 
 ### Notes on supported versions
 

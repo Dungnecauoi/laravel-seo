@@ -436,6 +436,33 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Blade admin panel
+    |--------------------------------------------------------------------------
+    |
+    | A working meta editor at /seo/panel/{type}/{id}, published views included
+    | — disabled by default and behind the same viewSeoPanel Gate as the API.
+    |
+    | Its fetch calls go through `web` middleware (session + CSRF), not the
+    | token auth the REST API above expects: a same-origin admin page already
+    | has both, and routing through bearer tokens would mean standing up
+    | Sanctum just for this page. Set the SAME model types in seo.api.models —
+    | the panel and the API share one allowlist, so a type must be exposed
+    | there regardless of which surface serves the page.
+    |
+    | React, Vue, or nothing at all also work: @duxbo/seo-react and
+    | @duxbo/seo-vue are separate npm packages built on the REST API instead,
+    | for a project that already has a front-end build step.
+    |
+    */
+
+    'panel' => [
+        'enabled' => false,
+        'prefix' => 'seo/panel',
+        'middleware' => ['web', 'can:viewSeoPanel'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Content analysis
     |--------------------------------------------------------------------------
     |

@@ -162,9 +162,9 @@ budget caps what a runaway loop can spend.
 
 ### The npm client
 
-[`@duxbo/seo-core`](js/) holds the types, the API client, and the state handling
-every front end needs — dirty tracking, debounced analysis, contract-version
-checking. It renders nothing.
+[`@duxbo/seo-core`](js/packages/core/) holds the types, the API client, and the
+state handling every front end needs — dirty tracking, debounced analysis,
+contract-version checking. It renders nothing.
 
 ```ts
 const store = createMetaStore(seo, { type: 'post', id: 42 })
@@ -177,6 +177,38 @@ store.analyze(html)   // debounced; a stale response cannot overwrite a newer on
 That split is the point: the hard part of an SEO panel is knowing what changed
 and when to re-score, not the markup. Writing it once means a React or Vue
 adapter is a few hundred lines of rendering rather than a reimplementation.
+
+### UI: React, Vue, or Blade — pick one, or none
+
+Every UI here talks to the same backend and shares the same `viewSeoPanel`
+Gate. None is required; `seoTags()` alone is a complete, working integration
+with no admin UI at all.
+
+**[`@duxbo/seo-react`](js/packages/react/)** and **[`@duxbo/seo-vue`](js/packages/vue/)**
+— a hook/composable plus a Tailwind-styled `<SeoPanel>`, built on
+`@duxbo/seo-core`, for a project with a front-end build step:
+
+```tsx
+<SeoPanel client={client} target={{ type: 'post', id: post.id }} content={post.body} />
+```
+
+Both need `seo.api.enabled = true` and this package's build output added to
+Tailwind's `content` globs — the panel renders utility classes it does not
+carry any CSS for, so an unconfigured Tailwind purges them silently.
+
+**Blade**, for a project with none of that. `php artisan vendor:publish
+--tag=seo-views` to customise it, or use it as shipped:
+
+```php
+'panel' => ['enabled' => true],
+```
+
+`/seo/panel/{type}/{id}` renders a self-contained page — plain `fetch()`,
+scoped `seo-`-prefixed CSS, no build step, no Tailwind requirement. It talks to
+its own routes under `web` middleware (session and CSRF), not the token-based
+REST API: a same-origin admin page already has both, and routing through
+bearer tokens would mean standing up Sanctum just for one page. It shares the
+API's `seo.api.models` allowlist regardless of which surface is used.
 
 | Milestone | Scope | State |
 |---|---|---|

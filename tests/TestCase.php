@@ -44,6 +44,10 @@ abstract class TestCase extends Orchestra
         $app['config']->set('seo.indexable_environments', ['testing']);
 
         $app['config']->set('seo.site_name', 'Trang Của Tôi');
+
+        // Only exercised by the panel's web-middleware routes, which encrypt
+        // the session cookie — but harmless, and simpler, to set unconditionally.
+        $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
     }
 
     protected function defineDatabaseMigrations(): void

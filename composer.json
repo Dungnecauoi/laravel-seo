@@ -70,6 +70,6 @@
     "scripts-descriptions": {
         "test": "Run the suite against the installed PHP and Laravel",
         "test:matrix": "Run the suite across every supported version, in Docker",
-        "test:js": "Typecheck, build and test the npm client, in Docker"
+        "test:js": "Typecheck, build and test the npm packages (core, react, vue), in Docker"
     }
 }

@@ -16,7 +16,7 @@ final class MetaController extends ApiController
 
     public function show(Request $request, string $type, string $id): JsonResponse
     {
-        $model = $this->resolveModel($type, $id);
+        $model = $this->resolveExposedModel($type, $id);
         $locale = $request->query('locale');
 
         return $this->json([
@@ -28,7 +28,7 @@ final class MetaController extends ApiController
 
     public function update(Request $request, string $type, string $id): JsonResponse
     {
-        $model = $this->resolveModel($type, $id);
+        $model = $this->resolveExposedModel($type, $id);
 
         // An explicit whitelist, never $request->all(): this endpoint writes
         // straight into stored metadata.
@@ -72,7 +72,7 @@ final class MetaController extends ApiController
 
     public function destroy(Request $request, string $type, string $id): JsonResponse
     {
-        $model = $this->resolveModel($type, $id);
+        $model = $this->resolveExposedModel($type, $id);
         $locale = $request->query('locale');
 
         $this->seo->forget($model, is_string($locale) ? $locale : null);

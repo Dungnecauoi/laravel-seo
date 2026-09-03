@@ -96,6 +96,7 @@ final class SeoServiceProvider extends ServiceProvider
         // Check messages are translation keys, not sentences, so a panel can
         // render either language without the check knowing which.
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'seo');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'seo');
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -105,6 +106,10 @@ final class SeoServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../lang' => $this->app->langPath('vendor/seo'),
             ], 'seo-lang');
+
+            $this->publishes([
+                __DIR__.'/../resources/views' => $this->app->resourcePath('views/vendor/seo'),
+            ], 'seo-views');
 
             $this->publishMigrations();
 
@@ -314,8 +319,14 @@ final class SeoServiceProvider extends ServiceProvider
 
         $this->loadRoutesFrom(__DIR__.'/../routes/seo.php');
 
-        if ($this->app->make(Config::class)->get('seo.api.enabled', false) === true) {
+        $config = $this->app->make(Config::class);
+
+        if ($config->get('seo.api.enabled', false) === true) {
             $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+        }
+
+        if ($config->get('seo.panel.enabled', false) === true) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/panel.php');
         }
     }
 

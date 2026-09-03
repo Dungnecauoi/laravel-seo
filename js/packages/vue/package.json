@@ -1,0 +1,41 @@
+{
+  "name": "@duxbo/seo-vue",
+  "version": "0.9.0",
+  "description": "Vue composables and a Tailwind-styled SEO panel for the Laravel SEO package, built on @duxbo/seo-core.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test \"dist-test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@duxbo/seo-core": "0.9.0"
+  },
+  "peerDependencies": {
+    "vue": ">=3.3"
+  },
+  "devDependencies": {
+    "vue": "^3.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["seo", "laravel", "vue", "tailwind"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dungnecauoi/laravel-seo.git",
+    "directory": "js/packages/vue"
+  }
+}
