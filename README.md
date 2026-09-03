@@ -96,6 +96,14 @@ it can discard the whole hreflang cluster over it. The same resolver backs
 `hreflang` in HTML, the `languages` field in the Next.js formatter, and
 `<xhtml:link>` alternates in the sitemap, so all three agree.
 
+Every alternate comes from the *same* record's own URL, just asked for in
+another locale — there is no separate translation row that could point back
+the wrong way, so the classic "hreflang isn't reciprocal" bug cannot occur by
+construction here. What a misconfigured `locale_parameter` mapping or a
+custom `seo.locales.alternate_url` resolver *can* still do is produce the
+same URL for two different locales — Google discards the whole cluster over
+that too. `php artisan seo:hreflang {model}` checks every record for it.
+
 ### Structured data
 
 Implement `HasSchema` and return a plain array. Any schema.org type works, not
@@ -199,6 +207,50 @@ Because the window is narrow, this is the one sitemap source that resolves
 every record through the full pipeline rather than only checking stored
 values — a busy news site still only has a handful of articles from the last
 two days, not the millions a general sitemap streams through.
+
+### Search console verification, AI crawlers, and IndexNow
+
+```php
+'verification' => [
+    'google' => env('SEO_VERIFY_GOOGLE'),
+    'bing' => env('SEO_VERIFY_BING'),
+    // yandex, pinterest, facebook — same idea
+],
+```
+
+Paste the code each console gives you and it is emitted as a `<meta>` tag —
+`google-site-verification`, `msvalidate.1`, and so on — in HTML output, the
+`meta` array Nuxt/Vue get, and Next's own `verification.google` /
+`verification.other` fields. Unset, and nothing is emitted for that console.
+
+```php
+'robots' => ['block_ai_crawlers' => true],
+```
+
+A separate decision from indexing: this disallows GPTBot, ClaudeBot,
+Google-Extended and the rest of a curated list in `robots.txt`, without
+touching whether Googlebot or Bingbot can still index the site — "can this be
+searched" and "can this be used to train a model" are not the same question,
+and a project should not have to hand-list every bot user-agent to answer
+only one of them.
+
+```bash
+php artisan seo:indexnow /bai-viet-moi /bai-viet-khac
+```
+
+Bing, Yandex and Seznam pick up a changed URL almost immediately through
+IndexNow instead of waiting for their next crawl — Google does not
+participate, a submitted sitemap is still the only signal it reads. Off by
+default (`seo.indexnow.enabled`), since installing a package must never start
+an outbound request on its own; the key doubles as the file this package
+serves at `/{key}.txt` for IndexNow to confirm the submission came from
+whoever owns the domain, so generate one once and keep it in `.env` rather
+than regenerating it. Nothing in this package calls the command or the
+underlying `IndexNowSubmitter` automatically — listen for `SeoMetaSaved`
+(fired after every `Seo::save()`) and submit from there if a project wants
+that; auto-submitting on every save would mean a blocking outbound request on
+every panel edit, for every project, whether or not IndexNow is relevant to
+it.
 
 ### Redirects and the 404 monitor
 

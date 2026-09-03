@@ -65,6 +65,17 @@ final class RobotsTxt
             $lines[] = '';
         }
 
+        if ($this->config->get('seo.robots.block_ai_crawlers', false) === true) {
+            /** @var list<string> $bots */
+            $bots = $this->config->get('seo.robots.ai_crawlers', []);
+
+            foreach ($bots as $bot) {
+                $lines[] = 'User-agent: '.$bot;
+                $lines[] = 'Disallow: /';
+                $lines[] = '';
+            }
+        }
+
         foreach ($this->sitemapUrls() as $url) {
             $lines[] = 'Sitemap: '.$url;
         }

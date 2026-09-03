@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Duxbo\Seo\Http\Controllers\IndexNowKeyController;
 use Duxbo\Seo\Http\Controllers\RobotsController;
 use Duxbo\Seo\Http\Controllers\SitemapController;
 use Illuminate\Support\Facades\Route;
@@ -34,4 +35,13 @@ if (config('seo.sitemap.enabled', true) === true) {
 
 if (config('seo.robots.enabled', true) === true) {
     Route::get('robots.txt', RobotsController::class)->name('seo.robots');
+}
+
+$indexNowKey = config('seo.indexnow.key');
+
+if (config('seo.indexnow.enabled', false) === true && is_string($indexNowKey) && $indexNowKey !== '') {
+    // The literal key, not a {key} wildcard — IndexNow only ever checks the
+    // one file it named in the submission, and a wildcard here would swallow
+    // any other *.txt route the host application registers.
+    Route::get($indexNowKey.'.txt', IndexNowKeyController::class)->name('seo.indexnow.key');
 }

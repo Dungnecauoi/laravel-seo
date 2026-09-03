@@ -8,6 +8,8 @@ use Closure;
 use Duxbo\Seo\Analysis\Analyzer;
 use Duxbo\Seo\Analysis\DomContentExtractor;
 use Duxbo\Seo\Console\DuplicatesCommand;
+use Duxbo\Seo\Console\HreflangAuditCommand;
+use Duxbo\Seo\Console\IndexNowCommand;
 use Duxbo\Seo\Console\PruneNotFoundCommand;
 use Duxbo\Seo\Console\SitemapCommand;
 use Duxbo\Seo\Contracts\ContentExtractor;
@@ -42,6 +44,7 @@ use Duxbo\Seo\Storage\EloquentMetadataRepository;
 use Duxbo\Seo\Support\Compat;
 use Duxbo\Seo\Url\ConfigUrlGenerator;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
@@ -124,6 +127,8 @@ final class SeoServiceProvider extends ServiceProvider
                 SitemapCommand::class,
                 PruneNotFoundCommand::class,
                 DuplicatesCommand::class,
+                HreflangAuditCommand::class,
+                IndexNowCommand::class,
             ]);
         }
     }
@@ -328,6 +333,8 @@ final class SeoServiceProvider extends ServiceProvider
                 $app->make(SchemaValidator::class),
                 $app->make(Analyzer::class),
                 $app->make(Ai\AiManager::class),
+                $app->make(UrlGenerator::class),
+                $app->make(Dispatcher::class),
             );
 
             $head = $app->make(HeadFormatter::class);

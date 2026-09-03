@@ -9,6 +9,7 @@ use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SeoContext;
 use Duxbo\Seo\Locale\AlternateLocaleResolver;
+use Duxbo\Seo\Support\SiteVerification;
 
 /**
  * The payload Unhead takes — Nuxt's `useHead()` and Vue's `@unhead/vue`.
@@ -23,6 +24,7 @@ final class HeadFormatter implements OutputFormatter
         private readonly LocaleResolver $locales,
         private readonly UrlGenerator $urls,
         private readonly AlternateLocaleResolver $alternateLocales,
+        private readonly SiteVerification $verification,
         private readonly string $name = 'head',
     ) {
     }
@@ -34,7 +36,7 @@ final class HeadFormatter implements OutputFormatter
 
     public function withName(string $name): self
     {
-        return new self($this->locales, $this->urls, $this->alternateLocales, $name);
+        return new self($this->locales, $this->urls, $this->alternateLocales, $this->verification, $name);
     }
 
     /**
@@ -58,6 +60,10 @@ final class HeadFormatter implements OutputFormatter
 
         if ($robots !== null) {
             $meta[] = ['name' => 'robots', 'content' => $robots];
+        }
+
+        foreach ($this->verification->metaTags() as $name => $content) {
+            $meta[] = ['name' => $name, 'content' => $content];
         }
 
         $meta[] = ['property' => 'og:type', 'content' => $og?->type ?? 'website'];

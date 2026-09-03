@@ -9,6 +9,7 @@ use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SeoContext;
 use Duxbo\Seo\Locale\AlternateLocaleResolver;
+use Duxbo\Seo\Support\SiteVerification;
 
 /**
  * The exact object Next.js App Router expects from `generateMetadata()`.
@@ -27,6 +28,7 @@ final class NextMetadataFormatter implements OutputFormatter
         private readonly LocaleResolver $locales,
         private readonly UrlGenerator $urls,
         private readonly AlternateLocaleResolver $alternateLocales,
+        private readonly SiteVerification $verification,
     ) {
     }
 
@@ -101,7 +103,39 @@ final class NextMetadataFormatter implements OutputFormatter
             ], static fn (mixed $v): bool => $v !== null);
         }
 
+        $verification = $this->verification();
+
+        if ($verification !== []) {
+            $metadata['verification'] = $verification;
+        }
+
         return $metadata;
+    }
+
+    /**
+     * Next's Metadata API has named slots for Google and Yandex; everything
+     * else — Bing, Pinterest, Facebook — goes under `other` keyed by the
+     * literal meta tag name Next renders it as, since it has no dedicated
+     * slot for them.
+     *
+     * @return array<string, mixed>
+     */
+    private function verification(): array
+    {
+        $tags = $this->verification->metaTags();
+        $other = [];
+
+        foreach ($tags as $name => $content) {
+            if ($name !== 'google-site-verification' && $name !== 'yandex-verification') {
+                $other[$name] = $content;
+            }
+        }
+
+        return array_filter([
+            'google' => $tags['google-site-verification'] ?? null,
+            'yandex' => $tags['yandex-verification'] ?? null,
+            'other' => $other !== [] ? $other : null,
+        ], static fn (mixed $v): bool => $v !== null);
     }
 
     /**

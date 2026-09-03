@@ -14,17 +14,21 @@ use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\SchemaProvider;
 use Duxbo\Seo\Contracts\Seoable;
 use Duxbo\Seo\Contracts\TokenResolver;
+use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\AnalysisReport;
 use Duxbo\Seo\Data\DuplicateMatch;
 use Duxbo\Seo\Data\SchemaGraph;
 use Duxbo\Seo\Data\SeoContext;
 use Duxbo\Seo\Data\SeoData;
+use Duxbo\Seo\Events\SeoMetaSaved;
+use Duxbo\Seo\Exceptions\CannotResolveUrl;
 use Duxbo\Seo\Exceptions\UnknownFormatter;
 use Duxbo\Seo\Resolution\Resolver;
 use Duxbo\Seo\Resolution\SeoDataBuilder;
 use Duxbo\Seo\Resolution\TokenExpander;
 use Duxbo\Seo\Schema\GraphAssembler;
 use Duxbo\Seo\Schema\SchemaValidator;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\HtmlString;
 
 /**
@@ -44,6 +48,8 @@ final class Seo
         private readonly SchemaValidator $validator,
         private readonly Analyzer $analyzer,
         private readonly AiManager $ai,
+        private readonly UrlGenerator $urls,
+        private readonly Dispatcher $events,
     ) {
     }
 
@@ -144,6 +150,31 @@ final class Seo
             is_array($data) ? SeoDataBuilder::fromDotted($data) : $data,
             $locale,
         );
+
+        $this->events->dispatch(new SeoMetaSaved($model, $locale, $this->safeUrl($model, $locale)));
+    }
+
+    /**
+     * The model's own URL — {@see Seoable::seoUrl()}, not
+     * {@see UrlGenerator::forModel()} directly, since most models answer it
+     * with their own override rather than the `seo.models.*.route` config
+     * mapping that method depends on. Turned into the locale-specific
+     * variant the same way hreflang alternates are, when a locale other than
+     * the page's own was asked for.
+     *
+     * Never lets a save fail over a URL that cannot be resolved yet — that is
+     * a presentation concern the event should surface as null, not something
+     * {@see save()} itself should ever throw over.
+     */
+    private function safeUrl(Seoable $model, ?string $locale): ?string
+    {
+        try {
+            $url = $model->seoUrl();
+
+            return $locale !== null ? $this->urls->alternate($url, $locale) : $url;
+        } catch (CannotResolveUrl) {
+            return null;
+        }
     }
 
     public function forget(Seoable $model, ?string $locale = null): void

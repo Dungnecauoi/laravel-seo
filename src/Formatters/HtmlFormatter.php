@@ -9,6 +9,7 @@ use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SeoContext;
 use Duxbo\Seo\Locale\AlternateLocaleResolver;
+use Duxbo\Seo\Support\SiteVerification;
 use Illuminate\Support\HtmlString;
 
 // JSON-LD is appended here rather than left as a separate call, so a layout
@@ -28,6 +29,7 @@ final class HtmlFormatter implements OutputFormatter
         private readonly UrlGenerator $urls,
         private readonly JsonLdFormatter $jsonLd,
         private readonly AlternateLocaleResolver $alternateLocales,
+        private readonly SiteVerification $verification,
     ) {
     }
 
@@ -57,6 +59,10 @@ final class HtmlFormatter implements OutputFormatter
 
         if ($robots !== null) {
             $lines[] = self::meta('name', 'robots', $robots);
+        }
+
+        foreach ($this->verification->metaTags() as $name => $content) {
+            $lines[] = self::meta('name', $name, $content);
         }
 
         foreach ($this->hreflang($context) as $line) {

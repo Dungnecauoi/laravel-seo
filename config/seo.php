@@ -129,6 +129,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Search engine verification
+    |--------------------------------------------------------------------------
+    |
+    | Paste the code each console gives you when adding this property — not
+    | the whole HTML snippet, just the value of its content attribute. Emitted
+    | as a <meta> tag on every page (Google, Bing and Yandex only check the
+    | home page, but a mismatch between which page carries it and which page
+    | the crawler samples is not worth guarding against). Leave unset and
+    | nothing is emitted for that console.
+    |
+    */
+
+    'verification' => [
+        'google' => env('SEO_VERIFY_GOOGLE'),
+        'bing' => env('SEO_VERIFY_BING'),
+        'yandex' => env('SEO_VERIFY_YANDEX'),
+        'pinterest' => env('SEO_VERIFY_PINTEREST'),
+        'facebook' => env('SEO_VERIFY_FACEBOOK'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Indexable environments
     |--------------------------------------------------------------------------
     |
@@ -318,6 +340,54 @@ return [
 
         // Extra sitemap URLs to advertise besides this package's own.
         'sitemaps' => [],
+
+        // Separate from 'groups' above: this blocks AI training crawlers
+        // specifically, while leaving Googlebot, Bingbot and the rest of
+        // '*' untouched — the two are different decisions ("can this be
+        // searched" vs. "can this be used to train a model") and a project
+        // that wants one without the other should not have to hand-list
+        // every bot user-agent itself.
+        'block_ai_crawlers' => env('SEO_BLOCK_AI_CRAWLERS', false),
+
+        'ai_crawlers' => [
+            'GPTBot',            // OpenAI — training
+            'ChatGPT-User',      // OpenAI — plugin/browsing on a user's behalf
+            'Google-Extended',   // Google — Gemini/Vertex training, separate from Googlebot
+            'ClaudeBot',         // Anthropic — training
+            'Claude-Web',        // Anthropic — browsing on a user's behalf
+            'anthropic-ai',
+            'CCBot',             // Common Crawl — dataset behind many third-party models
+            'PerplexityBot',
+            'Applebot-Extended', // Apple Intelligence training, separate from Applebot
+            'Bytespider',        // ByteDance
+            'Amazonbot',
+            'Diffbot',
+            'FacebookBot',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | IndexNow
+    |--------------------------------------------------------------------------
+    |
+    | Bing, Yandex and Seznam pick up a changed URL almost immediately instead
+    | of waiting for their next crawl. Google does not participate in
+    | IndexNow — for it, a submitted sitemap is still the only real signal.
+    |
+    | Off by default: this makes an outbound HTTP request, and installing a
+    | package must never start one on its own. `key` doubles as the filename
+    | (`{key}.txt`) this package serves at the site root so IndexNow can
+    | confirm the submission actually came from whoever owns the domain — it
+    | must stay the same between deploys, so generate it once and keep it in
+    | .env rather than regenerating on every submission.
+    |
+    */
+
+    'indexnow' => [
+        'enabled' => env('SEO_INDEXNOW_ENABLED', false),
+        'key' => env('SEO_INDEXNOW_KEY'),
+        'endpoint' => 'https://api.indexnow.org/indexnow',
     ],
 
     /*

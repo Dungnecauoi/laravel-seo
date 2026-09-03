@@ -73,6 +73,53 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — search console verification, AI crawler control, IndexNow, hreflang collision audit
+
+Four gaps from a third audit, this time asking not "is the core stable" but
+"is it enough to actually rank well on Google and elsewhere":
+
+- **Search console verification** — `seo.verification.{google,bing,yandex,pinterest,facebook}`,
+  emitted as the matching `<meta>` tag (`google-site-verification`,
+  `msvalidate.1`, …) by `HtmlFormatter` and `HeadFormatter`, and mapped to
+  Next's native `verification.google` / `verification.yandex` /
+  `verification.other` fields by `NextMetadataFormatter`. Read once by a new
+  `Support\SiteVerification`, since the value is site-wide rather than
+  per-record and does not belong in the resolution pipeline everything else
+  goes through.
+- **AI crawler blocking in robots.txt** — `seo.robots.block_ai_crawlers` (off
+  by default) disallows a curated list of AI-training user-agents (GPTBot,
+  ClaudeBot, Google-Extended, CCBot, …) in a separate `User-agent` block per
+  bot, deliberately independent of the existing `groups` config: whether a
+  site can be searched and whether it can be used to train a model are two
+  different decisions, and a project wanting one without the other should
+  not have to hand-list every bot itself.
+- **IndexNow** — `IndexNow\IndexNowSubmitter` posts to the shared IndexNow
+  endpoint so Bing, Yandex and Seznam pick up a changed URL immediately
+  instead of waiting for their next crawl (Google does not participate;
+  a submitted sitemap is still the only signal it reads). Off by default,
+  and calling it while off is a silent no-op — the same promise the AI
+  manager's `NullDriver` makes — but `enabled = true` with no key fails
+  loudly, since a developer who explicitly turned it on almost certainly
+  meant to set one too. The key doubles as the filename (`{key}.txt`) this
+  package now serves at the site root, registered as a literal route rather
+  than a wildcard so it cannot shadow anything else. `php artisan
+  seo:indexnow {urls*}` for manual or scripted submission. A new
+  `SeoMetaSaved` event fires after every `Seo::save()` — the extension point
+  for a project that wants IndexNow, or anything else, triggered
+  automatically; this package does not wire that up itself, since a blocking
+  outbound request on every panel save is not something every project
+  installing this package wants.
+- **Hreflang collision audit** — `php artisan seo:hreflang {model}`. This
+  package's hreflang alternates all come from one record's own URL asked for
+  in different locales, so the classic "hreflang isn't reciprocal" bug (page
+  A points to B, B never points back) cannot happen by construction here.
+  What can still happen: a misconfigured `locale_parameter` mapping or a
+  custom `alternate_url` resolver that ignores its `$locale` argument,
+  producing the *same* URL for two different `hreflang` values — which gets
+  the whole cluster discarded by Google just as surely. The command resolves
+  every record's alternates the same way the formatters do and flags any
+  that collide.
+
 ### Added — the same admin shell for React and Vue
 
 The Blade shell above had no equivalent for a project with a front-end build
