@@ -1,7 +1,14 @@
 {
     "name": "duxbo/laravel-seo",
-    "description": "Headless SEO toolkit for Laravel 9-13. Meta, schema.org, sitemap, redirects, content analysis. No third-party runtime dependencies.",
-    "keywords": ["laravel", "seo", "schema-org", "sitemap", "meta-tags", "headless"],
+    "description": "Headless SEO toolkit for Laravel 12 and 13. Meta, schema.org, sitemaps, redirects, Vietnamese-aware content analysis. No third-party runtime dependencies.",
+    "keywords": [
+        "laravel",
+        "seo",
+        "schema-org",
+        "sitemap",
+        "meta-tags",
+        "headless"
+    ],
     "license": "MIT",
     "authors": [
         {
@@ -54,5 +61,15 @@
         "sort-packages": true
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "scripts": {
+        "test": "phpunit",
+        "test:matrix": "docker/matrix.sh",
+        "test:js": "docker/js.sh"
+    },
+    "scripts-descriptions": {
+        "test": "Run the suite against the installed PHP and Laravel",
+        "test:matrix": "Run the suite across every supported version, in Docker",
+        "test:js": "Typecheck, build and test the npm client, in Docker"
+    }
 }

@@ -1,6 +1,6 @@
 # laravel-seo
 
-Headless SEO toolkit for Laravel 9 – 13.
+Headless SEO toolkit for Laravel 12 and 13.
 
 Meta and Open Graph, schema.org JSON-LD, sitemaps, redirects, 404 monitoring,
 content analysis (including Vietnamese) and optional AI assistance — with a
@@ -12,7 +12,11 @@ stops maintaining.
 
 ## Status
 
-Under construction, but **usable from M2 onward**: add the trait to a model and
+Feature-complete at **0.9**, and not yet 1.0 on purpose: nothing here has run in
+a production site, and that is the only thing that turns a well-built package
+into a hardened one. `Contracts/` stays open until it has.
+
+**Usable from M2 onward**: add the trait to a model and
 meta tags render, with a fallback chain behind them.
 
 ```php
@@ -156,6 +160,24 @@ for a Vietnamese description reliably produces stilted Vietnamese. Results are
 cached by content hash, every call is logged with its tokens, and a daily token
 budget caps what a runaway loop can spend.
 
+### The npm client
+
+[`@duxbo/seo-core`](js/) holds the types, the API client, and the state handling
+every front end needs — dirty tracking, debounced analysis, contract-version
+checking. It renders nothing.
+
+```ts
+const store = createMetaStore(seo, { type: 'post', id: 42 })
+await store.load()
+store.set('title', 'Tiêu đề mới')
+store.isDirty     // true
+store.analyze(html)   // debounced; a stale response cannot overwrite a newer one
+```
+
+That split is the point: the hard part of an SEO panel is knowing what changed
+and when to re-score, not the markup. Writing it once means a React or Vue
+adapter is a few hundred lines of rendering rather than a reimplementation.
+
 | Milestone | Scope | State |
 |---|---|---|
 | M1 | Contracts, data objects, Compat | done |
@@ -166,8 +188,8 @@ budget caps what a runaway loop can spend.
 | M6 | HTTP API, headless formatters | done |
 | M7 | Content analysis | done |
 | M8 | AI drivers | done |
-| M9 | `@duxbo/seo-core` npm package | next |
-| M10 | Docs, full CI matrix, 1.0 | |
+| M9 | `@duxbo/seo-core` npm package | done |
+| M10 | Docs, full CI matrix, 1.0 | done |
 
 ## Requirements
 
