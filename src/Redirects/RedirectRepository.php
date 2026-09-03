@@ -80,6 +80,24 @@ final class RedirectRepository
         $this->matcher->flush();
     }
 
+    /**
+     * Toggle by row id — what a table of existing rules operates on, rather
+     * than reconstructing the normalised source path to look one up again.
+     */
+    public function setActive(int $id, bool $active): void
+    {
+        Redirect::query()->whereKey($id)->update(['is_active' => $active]);
+
+        $this->matcher->flush();
+    }
+
+    public function deleteById(int $id): void
+    {
+        Redirect::query()->whereKey($id)->delete();
+
+        $this->matcher->flush();
+    }
+
     private function targetFor(string $path): ?string
     {
         return $this->matcher->match($path)?->target;

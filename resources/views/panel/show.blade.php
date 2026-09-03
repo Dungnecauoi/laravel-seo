@@ -1,79 +1,17 @@
-<!doctype html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>SEO — {{ $type }} #{{ $id }}</title>
+@extends('seo::panel.layout')
+
+@section('title', $type.' #'.$id)
+@section('subtitle', $seoUrl)
+
+@push('head')
     <style>
-        /*
-         * Scoped under .seo-panel and prefixed `seo-`, so this page never
-         * depends on the host project having Tailwind configured — unlike the
-         * React and Vue packages, a Blade view ships to projects that may have
-         * no front-end build step at all.
-         */
-        .seo-panel { box-sizing: border-box; }
-        .seo-panel *, .seo-panel *::before, .seo-panel *::after { box-sizing: inherit; }
-
-        body {
-            margin: 0;
-            background: #f8fafc;
-            color: #0f172a;
-            font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-
-        .seo-panel {
-            max-width: 640px;
-            margin: 0 auto;
-            padding: 32px 20px 64px;
-        }
-
-        .seo-eyebrow {
-            font-size: 11px;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-            color: #64748b;
-            margin: 0 0 4px;
-        }
-
-        .seo-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin: 0 0 24px;
-            word-break: break-all;
-        }
-
-        .seo-field { display: block; margin-bottom: 20px; }
-        .seo-label { display: block; font-weight: 600; color: #334155; margin-bottom: 6px; }
-
-        .seo-input, .seo-textarea {
-            width: 100%;
-            padding: 9px 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font: inherit;
-            color: inherit;
-            background: #fff;
-        }
-        .seo-input:focus, .seo-textarea:focus {
-            outline: none;
-            border-color: #64748b;
-            box-shadow: 0 0 0 1px #64748b;
-        }
+        /* Page-specific — everything shared (buttons, fields, status
+           banners) already comes from the layout. */
         .seo-textarea { resize: vertical; min-height: 72px; }
 
         .seo-hint { margin: 6px 0 0; font-size: 12px; color: #94a3b8; }
         .seo-hint.is-ok { color: #059669; }
         .seo-hint.is-warn { color: #d97706; }
-
-        .seo-status {
-            margin: 0 0 20px;
-            padding: 10px 14px;
-            border-radius: 6px;
-            font-size: 13px;
-        }
-        .seo-status.is-error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-        .seo-status.is-loading { color: #64748b; }
 
         .seo-score {
             display: flex;
@@ -95,26 +33,14 @@
         .seo-check.is-warning .seo-check-dot { background: #d97706; }
         .seo-check.is-warning { color: #b45309; }
 
-        .seo-actions { display: flex; align-items: center; gap: 12px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
-        .seo-btn {
-            border: 1px solid transparent;
-            border-radius: 6px;
-            padding: 9px 16px;
-            font: inherit;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        .seo-btn:disabled { cursor: not-allowed; opacity: .5; }
-        .seo-btn-primary { background: #0f172a; color: #fff; }
-        .seo-btn-secondary { background: #fff; border-color: #cbd5e1; color: #334155; }
+        .seo-actions { display: flex; align-items: center; gap: 12px; padding-top: 20px; border-top: 1px solid #e2e8f0; margin-top: 4px; }
         .seo-dirty-flag { font-size: 12px; color: #b45309; }
     </style>
-</head>
-<body>
-    <main class="seo-panel" id="seo-panel" data-loading="true">
-        <p class="seo-eyebrow">{{ $type }} · {{ $locale ?? 'mặc định' }}</p>
-        <h1 class="seo-title">{{ $seoUrl }}</h1>
+@endpush
 
+@section('content')
+
+    <div id="seo-editor" style="max-width:560px">
         <div id="seo-status"></div>
 
         <label class="seo-field">
@@ -125,7 +51,7 @@
 
         <label class="seo-field">
             <span class="seo-label">Mô tả</span>
-            <textarea class="seo-textarea" id="seo-description" rows="3"></textarea>
+            <textarea class="seo-textarea seo-input" id="seo-description" rows="3"></textarea>
             <p class="seo-hint" id="seo-description-hint">0 ký tự</p>
         </label>
 
@@ -152,8 +78,11 @@
             <button type="button" class="seo-btn seo-btn-secondary" id="seo-reset" disabled>Hoàn tác</button>
             <span class="seo-dirty-flag" id="seo-dirty-flag" hidden>Có thay đổi chưa lưu</span>
         </div>
-    </main>
+    </div>
 
+@endsection
+
+@push('scripts')
     <script>
     (function () {
         'use strict';
@@ -216,6 +145,21 @@
         function showError(message) {
             els.status.innerHTML = '<p class="seo-status is-error" role="alert"></p>';
             els.status.firstChild.textContent = message;
+        }
+
+        function showWarnings(warnings) {
+            if (!warnings) return;
+            var messages = [];
+
+            if (warnings.duplicate_title) messages.push('Tiêu đề này đã dùng ở bản ghi khác.');
+            if (warnings.duplicate_description) messages.push('Mô tả này đã dùng ở bản ghi khác.');
+            if (messages.length === 0) return;
+
+            var p = document.createElement('p');
+            p.className = 'seo-status is-error';
+            p.setAttribute('role', 'alert');
+            p.textContent = messages.join(' ');
+            els.status.appendChild(p);
         }
 
         function clearStatus() {
@@ -358,9 +302,10 @@
             request(DATA_URL, {
                 method: 'PUT',
                 body: JSON.stringify(Object.assign({}, draft, { locale: LOCALE || undefined })),
-            }).then(function () {
+            }).then(function (response) {
                 stored = Object.assign({}, draft);
                 clearStatus();
+                showWarnings(response && response.warnings);
             }).catch(function (e) {
                 showError(e.message);
             }).finally(function () {
@@ -372,5 +317,4 @@
         load();
     })();
     </script>
-</body>
-</html>
+@endpush

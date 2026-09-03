@@ -60,7 +60,7 @@ final class PanelTest extends TestCase
 
         $response->assertOk();
         $response->assertSee($post->seoUrl(), false);
-        $response->assertSee('id="seo-panel"', false);
+        $response->assertSee('id="seo-editor"', false);
     }
 
     public function test_a_type_outside_the_allowlist_is_rejected(): void

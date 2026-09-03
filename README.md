@@ -344,12 +344,23 @@ carry any CSS for, so an unconfigured Tailwind purges them silently.
 'panel' => ['enabled' => true],
 ```
 
-`/seo/panel/{type}/{id}` renders a self-contained page — plain `fetch()`,
-scoped `seo-`-prefixed CSS, no build step, no Tailwind requirement. It talks to
-its own routes under `web` middleware (session and CSRF), not the token-based
-REST API: a same-origin admin page already has both, and routing through
-bearer tokens would mean standing up Sanctum just for one page. It shares the
-API's `seo.api.models` allowlist regardless of which surface is used.
+`/seo/panel` is a small admin shell, not just the one editor page:
+
+| Route | Purpose |
+|---|---|
+| `/seo/panel` | Dashboard — records with SEO data, missing meta by type, active redirects, 404 count |
+| `/seo/panel/content?type=post` | Paginated list of one model type with its resolved title |
+| `/seo/panel/{type}/{id}` | The single-record editor — title/description/keyword, live score |
+| `/seo/panel/redirects` | Create, toggle, and delete redirects |
+| `/seo/panel/not-found` | 404 log — prune old entries, or turn a hit straight into a redirect |
+| `/seo/panel/settings` | Read-only view of the master switch, allowlists, and enabled surfaces |
+
+Every page is plain `fetch()` and scoped `seo-`-prefixed CSS — no build step, no
+Tailwind requirement, no JS framework. It talks to its own routes under `web`
+middleware (session and CSRF), not the token-based REST API: a same-origin
+admin page already has both, and routing through bearer tokens would mean
+standing up Sanctum just for this. It shares the API's `seo.api.models`
+allowlist regardless of which surface is used.
 
 | Milestone | Scope | State |
 |---|---|---|

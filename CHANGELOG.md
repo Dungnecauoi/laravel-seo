@@ -36,11 +36,42 @@ find. `Contracts/` is frozen at 1.0, so it stays open until then.
   handling every front end needs, with no rendering and no dependencies.
 - **UI, in three flavours, none required** — `@duxbo/seo-react` and
   `@duxbo/seo-vue`, both a thin hook/composable over `@duxbo/seo-core` plus a
-  Tailwind-styled `<SeoPanel>`; and a Blade panel at `/seo/panel/{type}/{id}`
-  for a project with no front-end build step at all — plain `fetch()`, scoped
-  CSS, no Tailwind requirement. The Blade panel talks to its own routes under
-  `web` middleware (session + CSRF) rather than the token-based REST API, since
-  a same-origin admin page already has both.
+  Tailwind-styled `<SeoPanel>`; and a Blade admin shell at `/seo/panel` for a
+  project with no front-end build step at all — plain `fetch()`, scoped CSS,
+  no Tailwind requirement. The Blade panel talks to its own routes under `web`
+  middleware (session + CSRF) rather than the token-based REST API, since a
+  same-origin admin page already has both.
+
+### Added — Blade admin shell
+
+The single-record editor at `/seo/panel/{type}/{id}` had no menu around it —
+nothing rank-math-like to land on first, no way to see redirects or 404s
+without the database console. Built as thin controllers over repositories
+that already existed; no backend logic duplicated:
+- **Dashboard** (`/seo/panel`) — records with SEO data vs. total per type,
+  active redirect count, 404 count, configured sitemap sources, and a warning
+  banner when `seo.enabled` is off.
+- **Content list** (`/seo/panel/content?type=post`) — every record of one
+  type with its resolved title, paginated with a hand-rolled prev/next pager
+  rather than Laravel's default view, which pulls in Tailwind.
+- **Redirects** (`/seo/panel/redirects`) — create, toggle, and delete, reusing
+  `RedirectRepository`; an `UnsafeRedirect` from the existing open-redirect
+  guard now surfaces as a form validation error instead of a 500.
+  `RedirectRepository` gained `setActive()` and `deleteById()` for this, both
+  flushing the route matcher's cache like every other write already does.
+- **404 monitor** (`/seo/panel/not-found`) — prune entries older than N days,
+  or turn one hit straight into a redirect and remove it from the log in the
+  same action.
+- **Settings** (`/seo/panel/settings`) — read-only status of the master
+  switch, allowlists, and which optional surfaces are enabled; nothing here
+  writes.
+
+All five share one Gate (`viewSeoPanel`) and one layout with a nav badge for
+the current 404 count, fed by a view composer registered once in the service
+provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
+`settings`) sit alongside the pre-existing `{type}/{id}` catch-all; a test
+hits every one of them for real rather than trusting that the segment counts
+can't collide.
 
 ### Added — three roadmap items from the second audit's "not urgent" list
 

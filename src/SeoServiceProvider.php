@@ -103,6 +103,7 @@ final class SeoServiceProvider extends ServiceProvider
         // render either language without the check knowing which.
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'seo');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'seo');
+        $this->registerPanelViewComposer();
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
@@ -411,6 +412,30 @@ final class SeoServiceProvider extends ServiceProvider
     /**
      * `@seo` renders the meta tags for the current page.
      */
+    /**
+     * The 404 count badge in the nav needs a value on every panel page, not
+     * only the 404 monitor's own — a View composer is the one place that
+     * covers all of them without every controller remembering to pass it.
+     */
+    private function registerPanelViewComposer(): void
+    {
+        \Illuminate\Support\Facades\View::composer('seo::panel.layout', static function ($view): void {
+            if (array_key_exists('notFoundCount', $view->getData())) {
+                return;
+            }
+
+            try {
+                $count = \Illuminate\Support\Facades\DB::table((string) config('seo.not_found.table', 'seo_not_found'))->count();
+            } catch (\Throwable) {
+                // Migrations may not have run yet; a broken nav badge is not
+                // worth a fatal error over.
+                $count = 0;
+            }
+
+            $view->with('notFoundCount', $count);
+        });
+    }
+
     private function registerBladeDirective(): void
     {
         Blade::directive('seo', static function (string $expression): string {
