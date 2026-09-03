@@ -8,6 +8,7 @@ use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SeoContext;
+use Duxbo\Seo\Locale\AlternateLocaleResolver;
 use Illuminate\Support\HtmlString;
 
 // JSON-LD is appended here rather than left as a separate call, so a layout
@@ -26,6 +27,7 @@ final class HtmlFormatter implements OutputFormatter
         private readonly LocaleResolver $locales,
         private readonly UrlGenerator $urls,
         private readonly JsonLdFormatter $jsonLd,
+        private readonly AlternateLocaleResolver $alternateLocales,
     ) {
     }
 
@@ -83,17 +85,28 @@ final class HtmlFormatter implements OutputFormatter
      */
     private function hreflang(SeoContext $context): array
     {
-        $supported = $this->locales->supported();
+        // A model-backed page only claims the locales AlternateLocaleResolver
+        // can actually vouch for — emitting one for every globally supported
+        // locale regardless of whether this specific record has been
+        // translated is how a partially-translated site ends up pointing
+        // hreflang at pages that 404. A page with no model (a static route)
+        // has no per-record translation coverage to check in the first
+        // place, so the site-wide list is the reasonable assumption there —
+        // those pages are typically built for every locale by the developer,
+        // not left partially translated by a content editor.
+        $locales = $context->model !== null
+            ? $this->alternateLocales->resolve($context->model, $context->locale)
+            : $this->locales->supported();
 
         // One language needs no alternates, and emitting a single self-
         // referential hreflang is a common way to get the whole cluster ignored.
-        if (count($supported) < 2) {
+        if (count($locales) < 2) {
             return [];
         }
 
         $lines = [];
 
-        foreach ($supported as $locale) {
+        foreach ($locales as $locale) {
             $url = $this->urls->alternate($context->url, $locale);
             $lines[] = '<link rel="alternate" hreflang="'.self::e($locale).'" href="'.self::e($url).'">';
         }

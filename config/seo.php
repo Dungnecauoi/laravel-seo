@@ -24,6 +24,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Master switch
+    |--------------------------------------------------------------------------
+    |
+    | The safety net for a demo domain shown to a client before launch, or any
+    | environment that must never be indexed no matter what a content editor
+    | does on an individual page: set this to false (SEO_ENABLED=false) and
+    | every page forces noindex,nofollow — a stored per-page "index" cannot
+    | override it — robots.txt disallows everything, and the sitemap goes
+    | empty. Listing URLs a crawler has just been told not to index is its
+    | own contradiction, the same class of mistake as a stale robots.txt.
+    |
+    | This is stronger than, and separate from, 'indexable_environments'
+    | below: that one is a *default* a stored value is still allowed to beat,
+    | useful for testing SEO behaviour on staging. This one is not — it means
+    | "not this domain", regardless of environment or per-page overrides.
+    |
+    | Meta tags, Open Graph, canonical links and structured data still render
+    | as normal — a demo link shared in Slack should still preview nicely.
+    | Only what governs whether search engines index the page is affected.
+    |
+    */
+
+    'enabled' => env('SEO_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Site identity
     |--------------------------------------------------------------------------
     |

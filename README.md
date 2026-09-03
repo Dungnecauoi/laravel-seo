@@ -47,6 +47,44 @@ Load a whole index page without a query per record:
 $posts = Post::query()->withSeo()->paginate();
 ```
 
+### Demo domains — the master switch
+
+```env
+SEO_ENABLED=false
+```
+
+For a client-preview domain that must never reach the index, no matter what a
+content editor does on an individual page. Every page forces `noindex,nofollow`
+— a stored per-page override cannot beat it — `robots.txt` disallows
+everything, and the sitemap goes empty. Meta tags, Open Graph and canonical
+links still render, so a link shared in Slack still previews properly; only
+what governs indexing is affected.
+
+This is stronger than, and separate from, `seo.indexable_environments`: that
+one is a *default* a stored per-page value is still allowed to beat, useful
+for testing SEO behaviour on staging. `SEO_ENABLED=false` means "not this
+domain" regardless of environment or per-page overrides.
+
+### Hreflang and translation coverage
+
+Nothing is guessed. A model implements `HasAlternateLocales` to declare which
+locales it genuinely has content in:
+
+```php
+public function seoAlternateLocales(): array
+{
+    return ['vi', 'en'];   // only the ones this record actually has
+}
+```
+
+Without it, only locales with their own stored SEO row count as evidence.
+Assuming every record exists in every site-wide supported locale is exactly
+how a partially-translated site used to end up with `hreflang="en"` pointing
+at a page that 404s — and Google does not just ignore that one broken link,
+it can discard the whole hreflang cluster over it. The same resolver backs
+`hreflang` in HTML, the `languages` field in the Next.js formatter, and
+`<xhtml:link>` alternates in the sitemap, so all three agree.
+
 ### Structured data
 
 Implement `HasSchema` and return a plain array. Any schema.org type works, not
@@ -104,6 +142,15 @@ onto a public sitemap.
 `php artisan seo:sitemap` to write static files instead. Sources stream with
 `lazyById()` and are written with `XMLWriter`, so a million-row table costs
 constant memory.
+
+A record whose *stored* metadata marks it `noindex` is skipped automatically —
+listing a URL a crawler has just been told not to index is the same
+contradiction as a stale `robots.txt`. Only the stored value is checked, not
+the full resolution pipeline: resolving every row through several stages here
+would give up the streaming this is built for. A `noindex` applied only
+through a model-wide template, never entered on a specific record, is not
+caught this way — if a whole model should never appear in the sitemap, do not
+register it as a source.
 
 ### Redirects and the 404 monitor
 

@@ -78,12 +78,34 @@ final class HtmlFormatterTest extends TestCase
     {
         config(['seo.locales.supported' => ['vi', 'en']]);
 
-        $html = (string) $this->makePost()->seoTags();
+        $post = $this->makePost();
+
+        // The current locale ('en', Laravel's default test locale) is free —
+        // the page is being rendered in it right now. 'vi' needs its own
+        // evidence: a stored row is what AlternateLocaleResolver uses without
+        // HasAlternateLocales, since assuming a translation exists is exactly
+        // how a broken hreflang link used to end up on a page that has none.
+        $post->saveSeo(['title' => 'Bản tiếng Việt'], 'vi');
+
+        $html = (string) $post->fresh()->seoTags();
 
         $this->assertStringContainsString('hreflang="vi"', $html);
         $this->assertStringContainsString('hreflang="en"', $html);
         $this->assertStringContainsString('hreflang="x-default"', $html);
-        $this->assertStringContainsString('/en/bai-viet/bai-viet-mau', $html);
+        $this->assertStringContainsString('/vi/bai-viet/bai-viet-mau', $html);
+    }
+
+    public function test_a_locale_with_no_evidence_gets_no_alternate_link(): void
+    {
+        config(['seo.locales.supported' => ['vi', 'en']]);
+
+        // Nothing stored for 'vi', and the model does not implement
+        // HasAlternateLocales — with only the current ('en') locale known,
+        // there is nothing to pair it with, so no alternate is emitted at all
+        // rather than a guess that might 404.
+        $html = (string) $this->makePost()->seoTags();
+
+        $this->assertStringNotContainsString('hreflang', $html);
     }
 
     public function test_an_unknown_formatter_names_the_ones_that_exist(): void

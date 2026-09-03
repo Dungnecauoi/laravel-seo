@@ -20,6 +20,7 @@ use Duxbo\Seo\Formatters\HtmlFormatter;
 use Duxbo\Seo\Formatters\JsonLdFormatter;
 use Duxbo\Seo\Formatters\NextMetadataFormatter;
 use Duxbo\Seo\Http\Middleware\HandleNotFound;
+use Duxbo\Seo\Locale\AlternateLocaleResolver;
 use Duxbo\Seo\Locale\AppLocaleResolver;
 use Duxbo\Seo\Redirects\CachedRedirectMatcher;
 use Duxbo\Seo\Resolution\Resolver;
@@ -32,6 +33,7 @@ use Duxbo\Seo\Resolution\Tokens\NowToken;
 use Duxbo\Seo\Schema\GraphAssembler;
 use Duxbo\Seo\Schema\SchemaNormalizer;
 use Duxbo\Seo\Schema\SchemaValidator;
+use Duxbo\Seo\Support\SiteIndexability;
 use Duxbo\Seo\Sitemap\SitemapGenerator;
 use Duxbo\Seo\Sitemap\Sources\ModelSource;
 use Duxbo\Seo\Sitemap\Sources\RouteSource;
@@ -66,6 +68,8 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(Ai\AiBudget::class);
         $this->app->singleton(Ai\PromptLibrary::class);
         $this->app->singleton(Ai\AiManager::class);
+        $this->app->singleton(SiteIndexability::class);
+        $this->app->singleton(AlternateLocaleResolver::class);
 
         // Contracts, not concretes: every one of these is meant to be swapped.
         $this->app->singleton(LocaleResolver::class, AppLocaleResolver::class);
@@ -193,6 +197,7 @@ final class SeoServiceProvider extends ServiceProvider
                 $config,
                 $app->make(UrlGenerator::class),
                 $app->make('events'),
+                $app->make(SiteIndexability::class),
             );
 
             /** @var list<array<string, mixed>> $sources */
@@ -240,7 +245,8 @@ final class SeoServiceProvider extends ServiceProvider
                 ? $definition['name']
                 : strtolower(class_basename($model)).'s',
             urls: $app->make(UrlGenerator::class),
-            locales: $app->make(LocaleResolver::class),
+            alternateLocales: $app->make(AlternateLocaleResolver::class),
+            repository: $app->make(MetadataRepository::class),
             scope: ($definition['scope'] ?? null) instanceof Closure ? $definition['scope'] : null,
             changeFrequency: is_string($frequency) ? Enums\ChangeFrequency::tryFrom($frequency) : null,
             priority: isset($definition['priority']) ? (float) $definition['priority'] : null,

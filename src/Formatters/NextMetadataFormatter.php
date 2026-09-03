@@ -8,6 +8,7 @@ use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SeoContext;
+use Duxbo\Seo\Locale\AlternateLocaleResolver;
 
 /**
  * The exact object Next.js App Router expects from `generateMetadata()`.
@@ -25,6 +26,7 @@ final class NextMetadataFormatter implements OutputFormatter
     public function __construct(
         private readonly LocaleResolver $locales,
         private readonly UrlGenerator $urls,
+        private readonly AlternateLocaleResolver $alternateLocales,
     ) {
     }
 
@@ -98,15 +100,20 @@ final class NextMetadataFormatter implements OutputFormatter
      */
     private function languages(SeoContext $context): array
     {
-        $supported = $this->locales->supported();
+        // See HtmlFormatter::hreflang() for why a model-backed page only
+        // claims locales AlternateLocaleResolver can vouch for, while a
+        // static route falls back to the site-wide list.
+        $locales = $context->model !== null
+            ? $this->alternateLocales->resolve($context->model, $context->locale)
+            : $this->locales->supported();
 
-        if (count($supported) < 2) {
+        if (count($locales) < 2) {
             return [];
         }
 
         $languages = [];
 
-        foreach ($supported as $locale) {
+        foreach ($locales as $locale) {
             $languages[$locale] = $this->urls->alternate($context->url, $locale);
         }
 

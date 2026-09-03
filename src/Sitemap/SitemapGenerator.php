@@ -9,6 +9,7 @@ use Duxbo\Seo\Contracts\SitemapSource;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SitemapUrl;
 use Duxbo\Seo\Events\SitemapUrlAdded;
+use Duxbo\Seo\Support\SiteIndexability;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
 
@@ -26,6 +27,7 @@ final class SitemapGenerator
         private readonly Config $config,
         private readonly UrlGenerator $urls,
         private readonly Dispatcher $events,
+        private readonly SiteIndexability $indexability,
     ) {
     }
 
@@ -47,10 +49,21 @@ final class SitemapGenerator
     }
 
     /**
+     * Enabled sources — empty whenever the site as a whole should not be
+     * indexed. That single check governs both the HTTP sitemap routes and
+     * `seo:sitemap`, so a demo domain with `seo.enabled = false` never
+     * publishes a sitemap either, not only a noindex meta tag: listing URLs
+     * search engines have just been told not to index is its own
+     * contradiction, the same class of mistake as a stale robots.txt.
+     *
      * @return list<SitemapSource>
      */
     public function sources(): array
     {
+        if (! $this->indexability->ok()) {
+            return [];
+        }
+
         return array_values(array_filter(
             $this->sources,
             static fn (SitemapSource $source): bool => $source->enabled(),

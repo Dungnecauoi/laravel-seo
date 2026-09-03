@@ -42,6 +42,48 @@ find. `Contracts/` is frozen at 1.0, so it stays open until then.
   `web` middleware (session + CSRF) rather than the token-based REST API, since
   a same-origin admin page already has both.
 
+### Added — demo-domain master switch
+
+`SEO_ENABLED=false` forces `noindex,nofollow` on every page — unconditionally,
+where `indexable_environments` is a defeatable default — disallows everything
+in `robots.txt`, and empties the sitemap. The safety net for a client-preview
+domain that must never reach the index, where the alternative is forgetting
+one flag and having Google index throwaway content under a real client's
+domain. Meta tags, Open Graph and canonical links keep rendering, so a link
+shared in Slack still previews correctly.
+
+### Fixed — two real SEO defects, found by evaluating the package against what
+technical SEO actually requires rather than against its own tests
+
+- **hreflang pointed at translations that do not exist.** Every formatter and
+  the sitemap assumed a record existed in every `seo.locales.supported`
+  locale and emitted an alternate for each one regardless of whether that
+  specific record had been translated — so a Vietnamese-only post got a
+  `hreflang="en"` link pointing at a URL that 404s. Google does not merely
+  ignore that one broken link; it can discard the entire hreflang cluster
+  over it. Fixed with a new `AlternateLocaleResolver`, one place instead of
+  four independently-guessing ones: a model implementing the new
+  `HasAlternateLocales` contract is trusted outright, and without it only
+  locales with their own stored `seo_meta` row count as evidence. The
+  current locale being rendered is free (a formatter is obviously rendering
+  in it); the sitemap has no such freebie and needs at least two locales
+  with real evidence before emitting any alternate at all.
+- **The sitemap could list a page its own robots meta marks noindex.**
+  `ModelSource` handed every record straight to `SitemapUrl` without ever
+  checking its metadata — an editor marking one page noindex through the
+  panel did not stop it appearing in the sitemap, which is precisely the
+  contradiction Search Console flags as "Submitted URL marked noindex."
+  Fixed by batching a stored-metadata lookup per chunk (`findMany()` once
+  per `lazyById()` chunk, not once per row) and skipping a record whose
+  stored value marks it noindex — deliberately not resolving the full
+  pipeline per record, which would have given up the streaming design this
+  class exists for.
+
+One real bug surfaced while fixing the above: `LazyCollection::chunk()`
+returns chunks that are themselves `LazyCollection`, not the eager
+`Illuminate\Support\Collection` `findMany()` requires — caught immediately by
+the test suite as a `TypeError`, fixed with `->collect()` per chunk.
+
 ### Fixed — core audit
 
 A pass over the whole `src/` tree looking for what documentation claims and

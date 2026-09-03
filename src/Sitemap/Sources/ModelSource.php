@@ -6,15 +6,17 @@ namespace Duxbo\Seo\Sitemap\Sources;
 
 use Closure;
 use DateTimeInterface;
-use Duxbo\Seo\Contracts\LocaleResolver;
+use Duxbo\Seo\Contracts\MetadataRepository;
 use Duxbo\Seo\Contracts\Seoable;
 use Duxbo\Seo\Contracts\SitemapSource;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SitemapUrl;
 use Duxbo\Seo\Enums\ChangeFrequency;
+use Duxbo\Seo\Locale\AlternateLocaleResolver;
 use Generator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 /**
  * URLs from an Eloquent model.
@@ -34,7 +36,8 @@ final class ModelSource implements SitemapSource
         private readonly string $model,
         private readonly string $name,
         private readonly UrlGenerator $urls,
-        private readonly LocaleResolver $locales,
+        private readonly AlternateLocaleResolver $alternateLocales,
+        private readonly MetadataRepository $repository,
         private readonly ?Closure $scope = null,
         private readonly ?ChangeFrequency $changeFrequency = null,
         private readonly ?float $priority = null,
@@ -58,21 +61,47 @@ final class ModelSource implements SitemapSource
      */
     public function urls(): Generator
     {
-        $locales = $this->locales->supported();
-
         // lazyById, never get(): this is expected to run over tables with
         // millions of rows, and the generator is what keeps memory flat.
-        foreach ($this->query()->lazyById($this->chunk) as $record) {
-            /** @var Model&Seoable $record */
-            $url = new SitemapUrl(
-                loc: $record->seoUrl(),
-                lastModified: $this->lastModifiedOf($record),
-                changeFrequency: $this->changeFrequency,
-                priority: $this->priority,
-                alternates: $this->alternatesFor($record, $locales),
-            );
+        // chunk() on top batches the metadata lookup below — findMany() once
+        // per chunk rather than once per row, the same trade this package
+        // already makes for withSeo() on an index page. Each chunk is itself
+        // still a LazyCollection, so collect() materialises only that one
+        // chunk (bounded by $this->chunk) rather than the whole table —
+        // findMany() needs an eager Collection to group by morph type.
+        foreach ($this->query()->lazyById($this->chunk)->chunk($this->chunk) as $lazyBatch) {
+            /** @var Collection<int, Model&Seoable> $batch */
+            $batch = $lazyBatch->collect();
+            $stored = $this->repository->findMany($batch);
 
-            yield $url;
+            foreach ($batch as $record) {
+                $key = $record->seoType().':'.$record->seoKey();
+
+                // A record explicitly marked noindex must not appear in the
+                // sitemap — telling a crawler "please index this" here and
+                // "don't" in its own robots meta is exactly the contradiction
+                // Search Console flags as "Submitted URL marked noindex".
+                //
+                // Only the *stored* value is checked, not the full resolution
+                // pipeline: resolving every row through several stages here
+                // would mean the streaming design this class exists for no
+                // longer holds for a large table. A noindex applied only via
+                // a model-wide template or default, never entered as a
+                // specific record's own metadata, is not caught by this — if
+                // a whole model should never appear in the sitemap, the fix
+                // is not registering it as a source at all.
+                if ($stored->get($key)?->hasRobotsDirective('noindex') === true) {
+                    continue;
+                }
+
+                yield new SitemapUrl(
+                    loc: $record->seoUrl(),
+                    lastModified: $this->lastModifiedOf($record),
+                    changeFrequency: $this->changeFrequency,
+                    priority: $this->priority,
+                    alternates: $this->alternatesFor($record),
+                );
+            }
         }
     }
 
@@ -117,11 +146,12 @@ final class ModelSource implements SitemapSource
     }
 
     /**
-     * @param  list<string>  $locales
      * @return array<string, string>
      */
-    private function alternatesFor(Seoable $record, array $locales): array
+    private function alternatesFor(Seoable $record): array
     {
+        $locales = $this->alternateLocales->resolve($record);
+
         if (count($locales) < 2) {
             return [];
         }

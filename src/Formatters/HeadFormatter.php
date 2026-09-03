@@ -8,6 +8,7 @@ use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\OutputFormatter;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Data\SeoContext;
+use Duxbo\Seo\Locale\AlternateLocaleResolver;
 
 /**
  * The payload Unhead takes — Nuxt's `useHead()` and Vue's `@unhead/vue`.
@@ -21,6 +22,7 @@ final class HeadFormatter implements OutputFormatter
     public function __construct(
         private readonly LocaleResolver $locales,
         private readonly UrlGenerator $urls,
+        private readonly AlternateLocaleResolver $alternateLocales,
         private readonly string $name = 'head',
     ) {
     }
@@ -32,7 +34,7 @@ final class HeadFormatter implements OutputFormatter
 
     public function withName(string $name): self
     {
-        return new self($this->locales, $this->urls, $name);
+        return new self($this->locales, $this->urls, $this->alternateLocales, $name);
     }
 
     /**
@@ -98,10 +100,15 @@ final class HeadFormatter implements OutputFormatter
             }
         }
 
-        $supported = $this->locales->supported();
+        // See HtmlFormatter::hreflang() for why a model-backed page only
+        // claims locales AlternateLocaleResolver can vouch for, while a
+        // static route falls back to the site-wide list.
+        $locales = $context->model !== null
+            ? $this->alternateLocales->resolve($context->model, $context->locale)
+            : $this->locales->supported();
 
-        if (count($supported) >= 2) {
-            foreach ($supported as $locale) {
+        if (count($locales) >= 2) {
+            foreach ($locales as $locale) {
                 $link[] = [
                     'rel' => 'alternate',
                     'hreflang' => $locale,

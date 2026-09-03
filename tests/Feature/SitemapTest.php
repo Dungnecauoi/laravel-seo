@@ -24,6 +24,21 @@ final class SitemapTest extends TestCase
         ]);
     }
 
+    public function test_a_record_marked_noindex_is_excluded_from_the_sitemap(): void
+    {
+        $this->makePost(['slug' => 'hien-thi']);
+        $hidden = $this->makePost(['slug' => 'an-di']);
+        $hidden->saveSeo(['robots' => ['noindex']]);
+
+        // Telling a crawler "please index this" here and "don't" in the
+        // page's own robots meta is exactly the contradiction Search Console
+        // flags as "Submitted URL marked noindex".
+        $body = (string) $this->get('/sitemap-posts.xml')->getContent();
+
+        $this->assertStringContainsString('hien-thi', $body);
+        $this->assertStringNotContainsString('an-di', $body);
+    }
+
     public function test_the_index_lists_one_entry_per_source(): void
     {
         $this->makePost();
@@ -100,7 +115,15 @@ final class SitemapTest extends TestCase
 
     public function test_hreflang_alternates_appear_only_on_a_multilingual_site(): void
     {
-        $this->makePost();
+        $post = $this->makePost();
+
+        // The sitemap has no "currently rendering locale" the way a request
+        // does — unlike a formatter, nothing here is free. At least two
+        // locales need their own evidence (a stored row, absent
+        // HasAlternateLocales) before an alternate link is worth emitting;
+        // one alone has nothing to pair against.
+        $post->saveSeo(['title' => 'Tiếng Việt'], 'vi');
+        $post->saveSeo(['title' => 'English'], 'en');
 
         $this->assertStringNotContainsString('xhtml:link', (string) $this->get('/sitemap-posts.xml')->getContent());
 
@@ -109,6 +132,22 @@ final class SitemapTest extends TestCase
         $body = (string) $this->get('/sitemap-posts.xml')->getContent();
 
         $this->assertStringContainsString('hreflang="en"', $body);
+        $this->assertStringContainsString('hreflang="vi"', $body);
+    }
+
+    public function test_a_record_with_no_translation_evidence_gets_no_alternates(): void
+    {
+        // Nothing stored for any locale, and the model does not implement
+        // HasAlternateLocales — the old behaviour assumed every record
+        // existed in every globally supported locale, which is exactly what
+        // put a link to a 404 in a sitemap for a page with one translation.
+        $this->makePost();
+
+        config(['seo.locales.supported' => ['vi', 'en']]);
+
+        $body = (string) $this->get('/sitemap-posts.xml')->getContent();
+
+        $this->assertStringNotContainsString('xhtml:link', $body);
     }
 
     public function test_a_listener_can_exclude_a_url(): void

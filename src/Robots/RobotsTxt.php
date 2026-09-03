@@ -5,22 +5,24 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Robots;
 
 use Duxbo\Seo\Contracts\UrlGenerator;
+use Duxbo\Seo\Support\SiteIndexability;
 use Illuminate\Contracts\Config\Repository as Config;
-use Illuminate\Contracts\Foundation\Application;
 
 /**
  * Builds robots.txt.
  *
- * Outside an indexable environment the whole site is disallowed. Forgetting to
- * switch that on costs a day of traffic; forgetting to switch it off lets a
- * staging copy compete with production in the index for months, and the second
- * mistake is both more likely and far more expensive.
+ * Outside an indexable site the whole thing is disallowed — either because
+ * `seo.enabled` is off (a demo domain shown to a client) or the current
+ * environment is outside `seo.indexable_environments` (staging). Forgetting to
+ * switch indexing on costs a day of traffic; forgetting to switch it off lets
+ * a copy nobody meant to publish compete with production in the index for
+ * months, and the second mistake is both more likely and far more expensive.
  */
 final class RobotsTxt
 {
     public function __construct(
         private readonly Config $config,
-        private readonly Application $app,
+        private readonly SiteIndexability $indexability,
         private readonly UrlGenerator $urls,
     ) {
     }
@@ -87,13 +89,6 @@ final class RobotsTxt
 
     private function indexable(): bool
     {
-        $environments = $this->config->get('seo.indexable_environments', ['production']);
-
-        if (! is_array($environments)) {
-            return true;
-        }
-
-        /** @var list<string> $environments */
-        return $this->app->environment($environments);
+        return $this->indexability->ok();
     }
 }
