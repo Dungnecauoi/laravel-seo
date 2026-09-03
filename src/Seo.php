@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo;
 
+use Duxbo\Seo\Ai\AiManager;
 use Duxbo\Seo\Analysis\Analyzer;
 use Duxbo\Seo\Contracts\AnalysisCheck;
 use Duxbo\Seo\Contracts\HasBreadcrumbs;
@@ -41,6 +42,7 @@ final class Seo
         private readonly GraphAssembler $assembler,
         private readonly SchemaValidator $validator,
         private readonly Analyzer $analyzer,
+        private readonly AiManager $ai,
     ) {
     }
 
@@ -257,6 +259,15 @@ final class Seo
     public function analyzer(): Analyzer
     {
         return $this->analyzer;
+    }
+
+    /**
+     * The language model manager — `Seo::ai()->driver('claude')`, or
+     * `Seo::ai()->extend('my-llm', …)` to plug in your own.
+     */
+    public function ai(): AiManager
+    {
+        return $this->ai;
     }
 
     public function registerFormatter(OutputFormatter $formatter): self

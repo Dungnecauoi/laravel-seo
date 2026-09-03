@@ -63,6 +63,9 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(Redirects\RedirectGuard::class);
         $this->app->singleton(NotFound\NotFoundLogger::class);
         $this->app->singleton(Robots\RobotsTxt::class);
+        $this->app->singleton(Ai\AiBudget::class);
+        $this->app->singleton(Ai\PromptLibrary::class);
+        $this->app->singleton(Ai\AiManager::class);
 
         // Contracts, not concretes: every one of these is meant to be swapped.
         $this->app->singleton(LocaleResolver::class, AppLocaleResolver::class);
@@ -281,6 +284,7 @@ final class SeoServiceProvider extends ServiceProvider
                 $app->make(GraphAssembler::class),
                 $app->make(SchemaValidator::class),
                 $app->make(Analyzer::class),
+                $app->make(Ai\AiManager::class),
             );
 
             $head = $app->make(HeadFormatter::class);

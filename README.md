@@ -133,6 +133,29 @@ disabled by default and its Gate denies everyone until the application defines
 it — an SEO panel can rewrite every title on a site, so forgetting to configure
 it must lock the door rather than open it.
 
+### AI assistance
+
+Off by default, because installing a package must never start billing anyone.
+
+```php
+Seo::ai()->suggestMeta($html, keyword: 'tối ưu SEO', locale: 'vi');
+Seo::ai()->suggestKeywords($html, 'vi');
+
+// Anything else — Ollama, a local model, an internal API
+Seo::ai()->extend('my-llm', fn () => new MyDriver());
+```
+
+Claude, OpenAI and Gemini are reached over plain REST through Laravel's HTTP
+client; no vendor SDK is required or even suggested. Each driver asks its
+provider for schema-constrained output — tool use, `json_schema`,
+`responseSchema` — and prose where an object was expected is an error, never
+something to parse.
+
+Prompts are translated, not just their output: an English instruction asking
+for a Vietnamese description reliably produces stilted Vietnamese. Results are
+cached by content hash, every call is logged with its tokens, and a daily token
+budget caps what a runaway loop can spend.
+
 | Milestone | Scope | State |
 |---|---|---|
 | M1 | Contracts, data objects, Compat | done |
@@ -142,8 +165,8 @@ it must lock the door rather than open it.
 | M5 | Redirects, 404 monitor | done |
 | M6 | HTTP API, headless formatters | done |
 | M7 | Content analysis | done |
-| M8 | AI drivers | next |
-| M9 | `@duxbo/seo-core` npm package | |
+| M8 | AI drivers | done |
+| M9 | `@duxbo/seo-core` npm package | next |
 | M10 | Docs, full CI matrix, 1.0 | |
 
 ## Requirements

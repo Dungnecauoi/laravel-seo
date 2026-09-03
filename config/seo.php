@@ -341,6 +341,75 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | AI assistance
+    |--------------------------------------------------------------------------
+    |
+    | Off by default: installing a package must never start billing anyone.
+    | Set 'default' to claude, openai or gemini once a key is configured.
+    |
+    | Drivers call plain documented REST through Laravel's HTTP client. No
+    | vendor SDK is required or suggested — three SDKs would be three more
+    | libraries whose next major becomes this package's problem, for a feature
+    | that is off by default.
+    |
+    | Model names live here rather than in the drivers. They change often, and
+    | a hard-coded one turns into a maintenance task every few months.
+    |
+    */
+
+    'ai' => [
+        'default' => env('SEO_AI_DRIVER', 'null'),
+
+        'drivers' => [
+            'claude' => [
+                'key' => env('ANTHROPIC_API_KEY'),
+                'model' => env('SEO_AI_MODEL', 'claude-sonnet-5'),
+                'timeout' => 30,
+                'retries' => 2,
+            ],
+
+            'openai' => [
+                'key' => env('OPENAI_API_KEY'),
+                'model' => env('SEO_AI_MODEL'),
+                'base_url' => 'https://api.openai.com/v1',
+                'timeout' => 30,
+                'retries' => 2,
+            ],
+
+            'gemini' => [
+                'key' => env('GEMINI_API_KEY'),
+                'model' => env('SEO_AI_MODEL'),
+                'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
+                'timeout' => 30,
+                'retries' => 2,
+            ],
+        ],
+
+        // Same content and prompt is never billed twice. Seconds; 0 disables.
+        'cache_ttl' => 86400,
+
+        // A loop over a few thousand records is an ordinary thing to write and
+        // an expensive thing to run. 0 removes the cap.
+        'daily_token_budget' => 200000,
+
+        'log' => true,
+        'table' => 'seo_ai_log',
+
+        // Markup is noise the model pays for by the token.
+        'content_characters' => 4000,
+
+        // Published prices change; a hard-coded rate would make the cost column
+        // quietly wrong. Rates are per million tokens.
+        'pricing' => [
+            'currency' => 'USD',
+            'models' => [
+                // 'claude-sonnet-5' => ['input' => 3.00, 'output' => 15.00],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | HTTP API
     |--------------------------------------------------------------------------
     |
