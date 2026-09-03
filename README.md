@@ -326,16 +326,24 @@ Gate. None is required; `seoTags()` alone is a complete, working integration
 with no admin UI at all.
 
 **[`@duxbo/seo-react`](js/packages/react/)** and **[`@duxbo/seo-vue`](js/packages/vue/)**
-— a hook/composable plus a Tailwind-styled `<SeoPanel>`, built on
-`@duxbo/seo-core`, for a project with a front-end build step:
+— hooks/composables plus a Tailwind-styled admin shell, built on
+`@duxbo/seo-core`, for a project with a front-end build step. `SeoPanel`
+edits one record; five more components cover the rest, each fetching through
+the same `SeoClient` and none of them routing on its own:
 
 ```tsx
 <SeoPanel client={client} target={{ type: 'post', id: post.id }} content={post.body} />
+<SeoDashboard client={client} onSelectType={(type) => router.push(`/admin/seo/content?type=${type}`)} />
+<SeoContentList client={client} type="post" onEdit={(type, id) => router.push(`/admin/seo/${type}/${id}`)} />
+<SeoRedirects client={client} />
+<SeoNotFoundMonitor client={client} />
+<SeoSettings client={client} />
 ```
 
-Both need `seo.api.enabled = true` and this package's build output added to
-Tailwind's `content` globs — the panel renders utility classes it does not
-carry any CSS for, so an unconfigured Tailwind purges them silently.
+All six need `seo.api.enabled = true` — they talk to `/api/seo/v1`, not the
+Blade panel's session routes — and this package's build output added to
+Tailwind's `content` globs, or the classes are purged and everything renders
+unstyled.
 
 **Blade**, for a project with none of that. `php artisan vendor:publish
 --tag=seo-views` to customise it, or use it as shipped:

@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use Duxbo\Seo\Http\Api\V1\AnalyzeController;
+use Duxbo\Seo\Http\Api\V1\ContentController;
+use Duxbo\Seo\Http\Api\V1\DashboardController;
 use Duxbo\Seo\Http\Api\V1\MetaController;
 use Duxbo\Seo\Http\Api\V1\NotFoundController;
+use Duxbo\Seo\Http\Api\V1\RedirectsController;
 use Duxbo\Seo\Http\Api\V1\ResolveController;
+use Duxbo\Seo\Http\Api\V1\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,4 +43,20 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
 
         Route::get('not-found', [NotFoundController::class, 'index']);
         Route::delete('not-found/{id}', [NotFoundController::class, 'destroy']);
+        Route::post('not-found/prune', [NotFoundController::class, 'prune']);
+        Route::post('not-found/{id}/redirect', [NotFoundController::class, 'redirect']);
+
+        // The admin-shell surfaces behind the same Gate: a dashboard, a
+        // content list, and redirect CRUD — the JSON twin of the Blade
+        // panel's own routes, for a React/Vue front end instead.
+        Route::get('dashboard', DashboardController::class);
+        Route::get('content', ContentController::class);
+        Route::get('settings', SettingsController::class);
+
+        Route::prefix('redirects')->group(static function (): void {
+            Route::get('/', [RedirectsController::class, 'index']);
+            Route::post('/', [RedirectsController::class, 'store']);
+            Route::patch('{id}/toggle', [RedirectsController::class, 'toggle'])->whereNumber('id');
+            Route::delete('{id}', [RedirectsController::class, 'destroy'])->whereNumber('id');
+        });
     });

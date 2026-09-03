@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Http\Api\V1;
 
+use Duxbo\Seo\Enums\RedirectType;
+use Duxbo\Seo\Exceptions\UnsafeRedirect;
+use Duxbo\Seo\NotFound\NotFoundLogger;
+use Duxbo\Seo\Redirects\RedirectRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Reads the 404 log.
@@ -39,8 +44,52 @@ final class NotFoundController extends ApiController
 
     public function destroy(int $id): JsonResponse
     {
-        DB::table((string) config('seo.not_found.table', 'seo_not_found'))->where('id', $id)->delete();
+        DB::table($this->table())->where('id', $id)->delete();
 
         return $this->json(['deleted' => true]);
+    }
+
+    public function prune(Request $request): JsonResponse
+    {
+        $days = max(1, (int) $request->input('days', 90));
+        $deleted = app(NotFoundLogger::class)->prune($days);
+
+        return $this->json(['deleted' => $deleted]);
+    }
+
+    /**
+     * The quick "turn this 404 into a redirect" action — the whole reason a
+     * 404 monitor is more useful next to a redirect manager than alone.
+     */
+    public function redirect(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'target' => ['required', 'string', 'max:2048'],
+        ]);
+
+        $row = DB::table($this->table())->find($id);
+
+        if ($row === null) {
+            return $this->json(['message' => 'Not found.'], 404);
+        }
+
+        try {
+            $redirect = app(RedirectRepository::class)->create(
+                source: (string) $row->path,
+                target: $validated['target'],
+                status: RedirectType::MovedPermanently,
+            );
+        } catch (UnsafeRedirect $e) {
+            throw ValidationException::withMessages(['target' => $e->getMessage()]);
+        }
+
+        DB::table($this->table())->where('id', $id)->delete();
+
+        return $this->json(['id' => $redirect->getKey()], 201);
+    }
+
+    private function table(): string
+    {
+        return (string) config('seo.not_found.table', 'seo_not_found');
     }
 }

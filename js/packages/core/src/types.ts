@@ -91,6 +91,86 @@ export interface NotFoundEntry {
  */
 export type OutputFormat = 'array' | 'html' | 'jsonld' | 'next' | 'nuxt' | 'vue'
 
+/** Shapes for the admin-shell endpoints — the dashboard, content list,
+ * redirects and settings a React/Vue front end builds on instead of the
+ * Blade panel. */
+
+export interface DashboardStats {
+  seoEnabled: boolean
+  totalRecords: number
+  missingByType: Record<string, number>
+  totalMissing: number
+  activeRedirects: number
+  notFoundCount: number
+  sitemapSources: number
+  exposedTypes: string[]
+}
+
+export interface ContentRow {
+  id: string | number
+  title: string | null
+  description: string | null
+  robots: string | null
+  url: string
+}
+
+export interface PageMeta {
+  currentPage: number
+  lastPage: number
+  total: number
+}
+
+export interface ContentListResponse {
+  exposedTypes: string[]
+  type: string | null
+  data: ContentRow[]
+  meta: PageMeta | null
+}
+
+export type RedirectMatchType = 'exact' | 'prefix' | 'regex'
+export type RedirectStatus = 301 | 302 | 307 | 308 | 410 | 451
+
+export interface RedirectEntry {
+  id: number
+  source: string
+  target: string | null
+  type: RedirectMatchType
+  status: RedirectStatus
+  isActive: boolean
+  locale: string | null
+  notes: string | null
+  hits: number
+}
+
+export interface RedirectInput {
+  source: string
+  target?: string | null
+  type: RedirectMatchType
+  status: RedirectStatus
+  locale?: string | null
+  notes?: string | null
+}
+
+export interface RedirectListResponse {
+  data: RedirectEntry[]
+  meta: PageMeta
+}
+
+export interface SettingsResponse {
+  seoEnabled: boolean
+  indexableEnvironments: string[]
+  currentEnvironment: string
+  apiEnabled: boolean
+  panelEnabled: boolean
+  exposedModels: string[]
+  allowedHosts: string[]
+  sitemapSourceCount: number
+  aiDriver: string
+  aiBudget: number
+  analysisRateLimit: string
+  supportedLocales: string[]
+}
+
 export interface SeoClientOptions {
   /** Origin of the Laravel application, without a trailing slash. */
   baseUrl: string

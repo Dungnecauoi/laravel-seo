@@ -73,6 +73,41 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — the same admin shell for React and Vue
+
+The Blade shell above had no equivalent for a project with a front-end build
+step — `@duxbo/seo-react` and `@duxbo/seo-vue` only had `SeoPanel`, the
+single-record editor. Five new components close that gap, one per Blade
+page: `SeoDashboard`, `SeoContentList`, `SeoRedirects`, `SeoNotFoundMonitor`,
+`SeoSettings`. None of them route — `onSelectType`/`onEdit` (React props) and
+`selectType`/`edit` (Vue emits) hand navigation back to the host app rather
+than assuming a router exists.
+
+They talk to `/api/seo/v1`, not the Blade panel's session routes, so five
+JSON endpoints were added behind the same `viewSeoPanel` Gate as the rest of
+the REST API: `GET dashboard`, `GET content`, `GET settings`, `GET|POST
+redirects` + `PATCH redirects/{id}/toggle` + `DELETE redirects/{id}`, and
+`POST not-found/prune` + `POST not-found/{id}/redirect` alongside the
+existing `not-found` index/destroy. Every one of them is the same repository
+call the Blade controllers already make — `RedirectRepository`,
+`NotFoundLogger`, `MetadataRepository`, `SitemapGenerator` — reached through
+a JSON twin of each Blade panel controller rather than new business logic.
+
+Two additions to `@duxbo/seo-core` came out of building these: the `SeoClient`
+interface gained the matching methods (`dashboard()`, `content()`,
+`settings()`, `redirects()`, `createRedirect()`, `toggleRedirect()`,
+`deleteRedirect()`, `pruneNotFound()`, `convertNotFoundToRedirect()`), and
+`SeoApiError` gained `fieldErrors()` / `fieldError(field)` — Laravel's 422
+response carries the specific validation reason under `errors.field`, not in
+the generic top-level `message`, and an unsafe-redirect rejection is unreadable
+without unwrapping that envelope.
+
+`NotFoundEntry.path` (and `referrer`/`user_agent`) is already HTML-escaped by
+the REST API, established when the API was first built — `SeoNotFoundMonitor`
+renders it with `dangerouslySetInnerHTML` / `v-html` for that reason, not
+despite it: plain text interpolation would double-escape it into literal
+`&lt;` text instead of the path Google actually requested.
+
 ### Added — three roadmap items from the second audit's "not urgent" list
 
 Confirmed via search rather than assumed: Google's current recommendation is

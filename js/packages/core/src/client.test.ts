@@ -119,3 +119,66 @@ test('the 404 listing is unwrapped from its data envelope', async () => {
   assert.equal(entries.length, 1)
   assert.equal(entries[0]?.hits, 3)
 })
+
+test('content lists a page of one type by query string', async () => {
+  let seen = ''
+
+  const client = createSeoClient({
+    baseUrl: 'https://example.com',
+    fetch: fakeFetch((url) => {
+      seen = url
+      return { body: { exposedTypes: ['post'], type: 'post', data: [], meta: null } }
+    }),
+  })
+
+  await client.content('post', 2)
+
+  assert.equal(seen, 'https://example.com/api/seo/v1/content?type=post&page=2')
+})
+
+test('creating a redirect posts the input and returns its id', async () => {
+  const client = createSeoClient({
+    baseUrl: 'https://example.com',
+    fetch: fakeFetch(() => ({ status: 201, body: { id: 5 } })),
+  })
+
+  const result = await client.createRedirect({ source: '/cu', target: '/moi', type: 'exact', status: 301 })
+
+  assert.equal(result.id, 5)
+})
+
+test('an unsafe redirect target surfaces as a validation error', async () => {
+  const client = createSeoClient({
+    baseUrl: 'https://example.com',
+    fetch: fakeFetch(() => ({
+      status: 422,
+      body: { message: 'The redirect target is not on an allowed host.', errors: { source: ['bad'] } },
+    })),
+  })
+
+  await assert.rejects(
+    () => client.createRedirect({ source: '/x', target: 'https://evil.example', type: 'exact', status: 301 }),
+    (error: unknown) => {
+      assert.ok(error instanceof SeoApiError)
+      assert.equal(error.isValidation, true)
+      return true
+    },
+  )
+})
+
+test('pruning 404 entries sends the day threshold', async () => {
+  let sentBody = ''
+
+  const client = createSeoClient({
+    baseUrl: 'https://example.com',
+    fetch: fakeFetch((_url, init) => {
+      sentBody = String(init.body)
+      return { body: { deleted: 3 } }
+    }),
+  })
+
+  const result = await client.pruneNotFound(30)
+
+  assert.equal(sentBody, JSON.stringify({ days: 30 }))
+  assert.equal(result.deleted, 3)
+})

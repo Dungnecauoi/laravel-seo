@@ -1,12 +1,17 @@
 import { SeoApiError, SeoTimeoutError } from './errors.js'
 import type {
   AnalysisReport,
+  ContentListResponse,
+  DashboardStats,
   MetaResponse,
   NotFoundEntry,
   OutputFormat,
+  RedirectInput,
+  RedirectListResponse,
   ResolvedMeta,
   SeoClientOptions,
   SeoData,
+  SettingsResponse,
 } from './types.js'
 
 /** The API contract this client was written against. */
@@ -20,6 +25,17 @@ export interface SeoClient {
   deleteMeta(type: string, id: string | number, locale?: string): Promise<void>
   notFound(limit?: number): Promise<NotFoundEntry[]>
   deleteNotFound(id: number): Promise<void>
+  pruneNotFound(days?: number): Promise<{ deleted: number }>
+  convertNotFoundToRedirect(id: number, target: string): Promise<{ id: number }>
+
+  dashboard(): Promise<DashboardStats>
+  content(type?: string, page?: number): Promise<ContentListResponse>
+  settings(): Promise<SettingsResponse>
+
+  redirects(page?: number): Promise<RedirectListResponse>
+  createRedirect(input: RedirectInput): Promise<{ id: number }>
+  toggleRedirect(id: number): Promise<{ isActive: boolean }>
+  deleteRedirect(id: number): Promise<void>
 }
 
 export interface AnalyzeInput {
@@ -153,6 +169,42 @@ export function createSeoClient(options: SeoClientOptions): SeoClient {
 
     async deleteNotFound(id) {
       await request(`not-found/${id}`, { method: 'DELETE' })
+    },
+
+    pruneNotFound(days) {
+      return request('not-found/prune', { method: 'POST', body: JSON.stringify({ days }) })
+    },
+
+    convertNotFoundToRedirect(id, target) {
+      return request(`not-found/${id}/redirect`, { method: 'POST', body: JSON.stringify({ target }) })
+    },
+
+    dashboard() {
+      return request('dashboard')
+    },
+
+    content(type, page) {
+      return request(`content${query({ type, page })}`)
+    },
+
+    settings() {
+      return request('settings')
+    },
+
+    redirects(page) {
+      return request(`redirects${query({ page })}`)
+    },
+
+    createRedirect(input) {
+      return request('redirects', { method: 'POST', body: JSON.stringify(input) })
+    },
+
+    toggleRedirect(id) {
+      return request(`redirects/${id}/toggle`, { method: 'PATCH' })
+    },
+
+    async deleteRedirect(id) {
+      await request(`redirects/${id}`, { method: 'DELETE' })
     },
   }
 }
