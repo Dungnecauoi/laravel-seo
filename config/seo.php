@@ -118,6 +118,13 @@ return [
         'og.type' => 'website',
         'og.site_name' => env('SEO_SITE_NAME', env('APP_NAME', 'Laravel')),
         'twitter.card' => 'summary_large_image',
+
+        // Google's own recommendation for publishers who want the most
+        // traffic from image-based results and Discover — without it, Google
+        // shows a smaller preview by default. A stored per-page robots value
+        // still overrides this like any other default; set null here to opt
+        // the whole site out.
+        'robots' => 'max-image-preview:large',
     ],
 
     /*

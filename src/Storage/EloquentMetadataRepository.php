@@ -7,6 +7,7 @@ namespace Duxbo\Seo\Storage;
 use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\MetadataRepository;
 use Duxbo\Seo\Contracts\Seoable;
+use Duxbo\Seo\Data\DuplicateMatch;
 use Duxbo\Seo\Data\SeoData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -147,6 +148,51 @@ final class EloquentMetadataRepository implements MetadataRepository
                     : $query->where($metaTable.'.locale', $locale);
             })
             ->lazyById();
+    }
+
+    public function duplicateTitles(Seoable $exclude, string $title, ?string $locale = null): array
+    {
+        return $this->duplicatesOf('title', $exclude, $title, $locale);
+    }
+
+    public function duplicateDescriptions(Seoable $exclude, string $description, ?string $locale = null): array
+    {
+        return $this->duplicatesOf('description', $exclude, $description, $locale);
+    }
+
+    /**
+     * @return list<DuplicateMatch>
+     */
+    private function duplicatesOf(string $column, Seoable $exclude, string $value, ?string $locale): array
+    {
+        if (trim($value) === '') {
+            return [];
+        }
+
+        $rows = SeoMeta::query()
+            ->where($column, $value)
+            ->when(
+                $locale === null,
+                static fn (Builder $q) => $q->whereNull('locale'),
+                static fn (Builder $q) => $q->where('locale', $locale),
+            )
+            // NOT (seoable_type = X AND seoable_id = Y), so this excludes only
+            // the record being checked, not merely a record that shares one
+            // of the two fields.
+            ->where(function (Builder $q) use ($exclude): void {
+                $q->where('seoable_type', '!=', $exclude->seoType())
+                    ->orWhere('seoable_id', '!=', (string) $exclude->seoKey());
+            })
+            ->limit(20)
+            ->get(['seoable_type', 'seoable_id', 'locale']);
+
+        return $rows
+            ->map(static fn (SeoMeta $row): DuplicateMatch => new DuplicateMatch(
+                $row->seoable_type,
+                $row->seoable_id,
+                $row->locale,
+            ))
+            ->all();
     }
 
     /**

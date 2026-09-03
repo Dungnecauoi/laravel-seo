@@ -76,9 +76,11 @@ final class ResolutionTest extends TestCase
         $this->assertSame('https://trangcuatoi.vn/bai-viet/bai-viet-mau', $post->seo()->canonical);
     }
 
-    public function test_an_indexable_environment_adds_no_robots_restriction(): void
+    public function test_an_indexable_environment_carries_only_the_image_preview_default(): void
     {
-        $this->assertNull($this->makePost()->seo()->robotsLine());
+        // Google's own recommendation for the most Discover/image traffic —
+        // not a restriction, which is why this is not "no robots line at all".
+        $this->assertSame('max-image-preview:large', $this->makePost()->seo()->robotsLine());
     }
 
     public function test_outside_an_indexable_environment_everything_is_noindex(): void

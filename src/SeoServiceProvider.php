@@ -7,6 +7,7 @@ namespace Duxbo\Seo;
 use Closure;
 use Duxbo\Seo\Analysis\Analyzer;
 use Duxbo\Seo\Analysis\DomContentExtractor;
+use Duxbo\Seo\Console\DuplicatesCommand;
 use Duxbo\Seo\Console\PruneNotFoundCommand;
 use Duxbo\Seo\Console\SitemapCommand;
 use Duxbo\Seo\Contracts\ContentExtractor;
@@ -121,6 +122,7 @@ final class SeoServiceProvider extends ServiceProvider
             $this->commands([
                 SitemapCommand::class,
                 PruneNotFoundCommand::class,
+                DuplicatesCommand::class,
             ]);
         }
     }
@@ -236,6 +238,34 @@ final class SeoServiceProvider extends ServiceProvider
 
         if (! is_string($model) || ! class_exists($model)) {
             return null;
+        }
+
+        // A model source carrying a 'news' block builds a NewsSitemapSource
+        // instead of a plain ModelSource — a separate, stricter sitemap
+        // Google News rejects an article from after 48 hours, so it is
+        // opt-in per source rather than something every model source gets.
+        $news = $definition['news'] ?? null;
+
+        if (is_array($news)) {
+            $dateColumn = $news['date_column'] ?? null;
+            $publicationName = $news['publication_name'] ?? null;
+            $publicationLanguage = $news['publication_language'] ?? null;
+
+            if (! is_string($dateColumn) || ! is_string($publicationName) || ! is_string($publicationLanguage)) {
+                return null;
+            }
+
+            return new Sitemap\Sources\NewsSitemapSource(
+                model: $model,
+                name: is_string($definition['name'] ?? null) ? $definition['name'] : 'news',
+                publicationName: $publicationName,
+                publicationLanguage: $publicationLanguage,
+                dateColumn: $dateColumn,
+                seo: $app->make(Seo::class),
+                scope: ($definition['scope'] ?? null) instanceof Closure ? $definition['scope'] : null,
+                maxAgeHours: isset($news['max_age_hours']) ? (int) $news['max_age_hours'] : 48,
+                enabled: ($definition['enabled'] ?? true) === true,
+            );
         }
 
         $frequency = $definition['changefreq'] ?? null;

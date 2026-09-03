@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Http\Api\V1;
 
+use Duxbo\Seo\Http\Concerns\WarnsAboutDuplicates;
 use Duxbo\Seo\Seo;
 use Duxbo\Seo\Support\SameOriginUrls;
 use Illuminate\Http\JsonResponse;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 final class MetaController extends ApiController
 {
+    use WarnsAboutDuplicates;
+
     public function __construct(
         private readonly Seo $seo,
         private readonly SameOriginUrls $sameOrigin,
@@ -78,7 +81,10 @@ final class MetaController extends ApiController
 
         $this->seo->save($model, $dotted, $locale);
 
-        return $this->json(['resolved' => $this->seo->for($model, $locale)->toArray()]);
+        return $this->json([
+            'resolved' => $this->seo->for($model, $locale)->toArray(),
+            'warnings' => $this->duplicateWarnings($this->seo, $model, $dotted, $locale),
+        ]);
     }
 
     public function destroy(Request $request, string $type, string $id): JsonResponse

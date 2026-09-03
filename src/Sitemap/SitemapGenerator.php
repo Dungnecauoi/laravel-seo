@@ -113,6 +113,8 @@ final class SitemapGenerator
         $writer = SitemapWriter::toMemory()->startUrlSet(
             alternates: $this->hasAlternates(),
             images: true,
+            videos: true,
+            news: true,
         );
 
         foreach ($this->urlsForPart($source, $part) as $url) {
@@ -144,6 +146,8 @@ final class SitemapGenerator
                 $writer = SitemapWriter::toFile($path)->startUrlSet(
                     alternates: $this->hasAlternates(),
                     images: true,
+                    videos: true,
+                    news: true,
                 );
 
                 foreach ($this->urlsForPart($source, $part) as $url) {

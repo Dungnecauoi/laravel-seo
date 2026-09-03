@@ -53,6 +53,11 @@ $posts = Post::query()->withSeo()->paginate();
 under `article`; the Open Graph spec ties them to that type, and every real
 consumer (Facebook, LinkedIn) ignores them on a `website` page regardless.
 
+`seo.defaults.robots` defaults to `max-image-preview:large` — Google's own
+recommendation for the most traffic from image results and Discover. A stored
+per-page robots value overrides it like any other default; set the config key
+to `null` to opt the whole site out.
+
 ### Demo domains — the master switch
 
 ```env
@@ -158,6 +163,43 @@ through a model-wide template, never entered on a specific record, is not
 caught this way — if a whole model should never appear in the sitemap, do not
 register it as a source.
 
+**Video sitemaps** attach to whatever a model already yields — implement
+`HasSitemapVideo` and the entry rides along on that record's own `<url>` block,
+since a video belongs on the page that hosts it, not in a separate feed:
+
+```php
+public function seoSitemapVideos(): array
+{
+    return [new SitemapVideo(
+        thumbnailLoc: $this->thumbnail_url,
+        title: $this->name,
+        description: $this->excerpt,
+        contentLoc: $this->video_url,
+        durationSeconds: $this->duration,
+    )];
+}
+```
+
+**News sitemaps** are a separate, stricter feed most projects never need —
+Google News rejects an article older than 48 hours outright, so a `news` block
+switches a model source into one that only ever lists what was just published:
+
+```php
+'sitemap' => ['sources' => [
+    ['model' => Article::class, 'name' => 'tin-tuc', 'news' => [
+        'publication_name' => 'Báo Của Tôi',
+        'publication_language' => 'vi',
+        'date_column' => 'published_at',
+        // 'max_age_hours' => 48,
+    ]],
+]],
+```
+
+Because the window is narrow, this is the one sitemap source that resolves
+every record through the full pipeline rather than only checking stored
+values — a busy news site still only has a handful of articles from the last
+two days, not the millions a general sitemap streams through.
+
 ### Redirects and the 404 monitor
 
 ```php
@@ -192,6 +234,30 @@ rather than producing a confident number that means nothing. In their place:
 sentence length in syllables, `được`/`bị` passive markers, and keyword matching
 that normalises Unicode first — "tiếng" has two spellings that look identical
 and would not otherwise compare equal.
+
+### Duplicate titles and descriptions
+
+Two live checks, one cheap and one thorough — the same split as the sitemap's
+noindex filter, for the same reason.
+
+Saving through the API or the panel checks the *stored* title/description
+against every other record's stored value and returns a warning — cheap
+enough for a request a save is waiting on:
+
+```json
+{ "resolved": {...}, "warnings": { "duplicate_title": [{ "type": "post", "id": "12" }] } }
+```
+
+```bash
+php artisan seo:duplicates App\\Models\\Post --field=both
+```
+
+resolves every record through the full fallback chain instead, catching what
+the live check cannot: two untitled posts that both inherit the same
+per-model template still show Google the identical title in two different
+search results, and nothing was ever *stored* to compare. It does not scale
+to millions of rows the way `seo:sitemap` does — it is an occasional audit,
+not a request-path check.
 
 ### Headless
 

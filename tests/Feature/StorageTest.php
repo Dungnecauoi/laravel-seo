@@ -74,11 +74,14 @@ final class StorageTest extends TestCase
             'robots' => json_encode([['directive' => 'some-future-directive', 'value' => null]]),
         ]);
 
-        // Dropping an unknown directive beats failing to render the page.
+        // Dropping an unknown directive beats failing to render the page. The
+        // stored robots array is empty once the unknown entry is dropped, so
+        // it counts as "not decided" and the site-wide default fills in —
+        // the same as if nothing had been stored at all.
         $data = $post->fresh()->seo();
 
         $this->assertSame('Giữ nguyên', $data->title);
-        $this->assertNull($data->robotsLine());
+        $this->assertSame('max-image-preview:large', $data->robotsLine());
     }
 
     public function test_eager_loading_resolves_a_page_of_records_without_a_query_each(): void

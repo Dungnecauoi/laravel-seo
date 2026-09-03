@@ -6,6 +6,7 @@ namespace Duxbo\Seo\Sitemap\Sources;
 
 use Closure;
 use DateTimeInterface;
+use Duxbo\Seo\Contracts\HasSitemapVideo;
 use Duxbo\Seo\Contracts\MetadataRepository;
 use Duxbo\Seo\Contracts\Seoable;
 use Duxbo\Seo\Contracts\SitemapSource;
@@ -100,6 +101,7 @@ final class ModelSource implements SitemapSource
                     changeFrequency: $this->changeFrequency,
                     priority: $this->priority,
                     alternates: $this->alternatesFor($record),
+                    videos: $record instanceof HasSitemapVideo ? $record->seoSitemapVideos() : [],
                 );
             }
         }

@@ -42,6 +42,50 @@ find. `Contracts/` is frozen at 1.0, so it stays open until then.
   `web` middleware (session + CSRF) rather than the token-based REST API, since
   a same-origin admin page already has both.
 
+### Added — three roadmap items from the second audit's "not urgent" list
+
+Confirmed via search rather than assumed: Google's current recommendation is
+`max-image-preview:large` for the most traffic from image results and
+Discover (up to 333% more clicks) — set as `seo.defaults.robots`'s default.
+A stored per-page value still overrides it like any other default; `null`
+opts the whole site out. Two existing tests that asserted "no robots line at
+all" for a plain indexable page were updated to reflect the new default
+rather than left passing for the wrong reason.
+
+**Duplicate title/description detection**, in two parts with different cost
+budgets — the same split the sitemap's noindex filter already uses:
+- A live check at save time (`MetadataRepository::duplicateTitles()` /
+  `duplicateDescriptions()`, new methods since the package is still pre-1.0
+  and `Contracts/` stays open until it isn't) compares only *stored* values
+  against other records — cheap enough for a request a save is waiting on.
+  Both the REST API and the panel now return a `warnings` key alongside
+  `resolved` after a save, shared through one `WarnsAboutDuplicates` trait
+  rather than duplicated across both controllers.
+- `php artisan seo:duplicates {model} --field=title|description|both`
+  resolves every record through the full fallback chain instead, catching
+  what the live check structurally cannot: two untitled posts that both
+  inherit the same per-model template still show Google an identical title
+  in two different search results, and there was never a stored value to
+  compare in the first place. Explicitly not built for the row counts
+  `seo:sitemap` handles — an occasional audit, not a request-path check.
+
+**Video and news sitemap support**, added as extensions of the existing
+sitemap rather than a parallel subsystem:
+- `HasSitemapVideo` lets a model attach `<video:video>` entries to whatever
+  `ModelSource` already yields for it — a video belongs on the page that
+  hosts it, not in a feed of its own.
+- A `'news'` block on a model source definition builds a `NewsSitemapSource`
+  instead of a plain one: Google News rejects an article older than 48
+  hours outright, so this is a genuinely different, stricter feed rather
+  than an option on the general one. Because the window is narrow, it is
+  the one sitemap source allowed to resolve every record through the full
+  pipeline rather than only checking stored values — a busy news site still
+  only has a handful of articles from the last two days, not the millions a
+  general sitemap has to stream through — and it excludes a stored-noindex
+  article the same way `ModelSource` does.
+- `SitemapWriter` gained the `video`/`news` XML namespaces and element
+  writers alongside the `image`/`xhtml` ones it already had.
+
 ### Added / Fixed — second core audit
 
 - **Canonical URLs pointed at another domain were accepted with zero

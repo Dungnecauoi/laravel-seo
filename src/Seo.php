@@ -15,6 +15,7 @@ use Duxbo\Seo\Contracts\SchemaProvider;
 use Duxbo\Seo\Contracts\Seoable;
 use Duxbo\Seo\Contracts\TokenResolver;
 use Duxbo\Seo\Data\AnalysisReport;
+use Duxbo\Seo\Data\DuplicateMatch;
 use Duxbo\Seo\Data\SchemaGraph;
 use Duxbo\Seo\Data\SeoContext;
 use Duxbo\Seo\Data\SeoData;
@@ -148,6 +149,28 @@ final class Seo
     public function forget(Seoable $model, ?string $locale = null): void
     {
         $this->repository->delete($model, $locale);
+    }
+
+    /**
+     * Other records whose stored title exactly matches — the live "this
+     * title is already used" warning, for a panel or API caller to surface
+     * to whoever is about to save it. Compares only what is stored, not
+     * every record's resolved fallback chain; `php artisan seo:duplicates`
+     * does the heavier, resolved comparison as an offline audit.
+     *
+     * @return list<DuplicateMatch>
+     */
+    public function duplicateTitles(Seoable $model, string $title, ?string $locale = null): array
+    {
+        return $this->repository->duplicateTitles($model, $title, $locale);
+    }
+
+    /**
+     * @return list<DuplicateMatch>
+     */
+    public function duplicateDescriptions(Seoable $model, string $description, ?string $locale = null): array
+    {
+        return $this->repository->duplicateDescriptions($model, $description, $locale);
     }
 
     public function registerToken(TokenResolver $resolver): self

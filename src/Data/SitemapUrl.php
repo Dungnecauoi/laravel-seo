@@ -18,6 +18,7 @@ final class SitemapUrl
     /**
      * @param  array<string, string>  $alternates  locale => URL, for hreflang.
      * @param  list<string>  $images  Image URLs to declare on this page.
+     * @param  list<SitemapVideo>  $videos
      */
     public function __construct(
         public readonly string $loc,
@@ -26,6 +27,8 @@ final class SitemapUrl
         public readonly ?float $priority = null,
         public readonly array $alternates = [],
         public readonly array $images = [],
+        public readonly array $videos = [],
+        public readonly ?SitemapNews $news = null,
     ) {
     }
 
@@ -46,6 +49,8 @@ final class SitemapUrl
             'priority' => $this->priority,
             'alternates' => $this->alternates,
             'images' => $this->images,
+            'videos' => $this->videos,
+            'news' => $this->news,
         ];
     }
 }

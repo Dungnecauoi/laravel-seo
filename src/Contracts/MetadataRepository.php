@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Contracts;
 
+use Duxbo\Seo\Data\DuplicateMatch;
 use Duxbo\Seo\Data\SeoData;
 use Illuminate\Support\Collection;
 use Illuminate\Support\LazyCollection;
@@ -53,4 +54,24 @@ interface MetadataRepository
      * @return LazyCollection<int, Seoable>
      */
     public function missing(string $modelClass, ?string $locale = null): LazyCollection;
+
+    /**
+     * Other records whose stored title exactly matches — the live
+     * "this title is already used" warning at save time.
+     *
+     * Compares the *stored* value only, not what a fallback chain would
+     * eventually resolve to; two untitled records that both inherit the same
+     * template are real duplicates too, but catching those means resolving
+     * every other record, which does not belong on the request path a save
+     * blocks on. `seo:duplicates` does that heavier, resolved comparison as
+     * an offline audit instead.
+     *
+     * @return list<DuplicateMatch>
+     */
+    public function duplicateTitles(Seoable $exclude, string $title, ?string $locale = null): array;
+
+    /**
+     * @return list<DuplicateMatch>
+     */
+    public function duplicateDescriptions(Seoable $exclude, string $description, ?string $locale = null): array;
 }

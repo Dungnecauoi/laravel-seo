@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Sitemap;
 
 use DateTimeInterface;
+use Duxbo\Seo\Data\SitemapNews;
 use Duxbo\Seo\Data\SitemapUrl;
+use Duxbo\Seo\Data\SitemapVideo;
 use XMLWriter;
 
 /**
@@ -25,6 +27,10 @@ final class SitemapWriter
     private bool $usesAlternates = false;
 
     private bool $usesImages = false;
+
+    private bool $usesVideos = false;
+
+    private bool $usesNews = false;
 
     private function __construct(XMLWriter $writer)
     {
@@ -64,11 +70,19 @@ final class SitemapWriter
     /**
      * @param  bool  $alternates  Declare the xhtml namespace for hreflang links.
      * @param  bool  $images  Declare the image namespace.
+     * @param  bool  $videos  Declare the video namespace.
+     * @param  bool  $news  Declare the news namespace.
      */
-    public function startUrlSet(bool $alternates = false, bool $images = false): self
-    {
+    public function startUrlSet(
+        bool $alternates = false,
+        bool $images = false,
+        bool $videos = false,
+        bool $news = false,
+    ): self {
         $this->usesAlternates = $alternates;
         $this->usesImages = $images;
+        $this->usesVideos = $videos;
+        $this->usesNews = $news;
 
         $this->writer->startDocument('1.0', 'UTF-8');
         $this->writer->setIndent(true);
@@ -83,6 +97,14 @@ final class SitemapWriter
 
         if ($images) {
             $this->writer->writeAttribute('xmlns:image', 'http://www.google.com/schemas/sitemap-image/1.1');
+        }
+
+        if ($videos) {
+            $this->writer->writeAttribute('xmlns:video', 'http://www.google.com/schemas/sitemap-video/1.1');
+        }
+
+        if ($news) {
+            $this->writer->writeAttribute('xmlns:news', 'http://www.google.com/schemas/sitemap-news/0.9');
         }
 
         return $this;
@@ -133,6 +155,16 @@ final class SitemapWriter
             }
         }
 
+        if ($this->usesVideos) {
+            foreach ($url->videos as $video) {
+                $this->writeVideo($video);
+            }
+        }
+
+        if ($this->usesNews && $url->news !== null) {
+            $this->writeNews($url->news);
+        }
+
         $this->writer->endElement();
 
         $this->count++;
@@ -142,6 +174,62 @@ final class SitemapWriter
         $this->writer->flush(false);
 
         return $this;
+    }
+
+    private function writeVideo(SitemapVideo $video): void
+    {
+        $this->writer->startElement('video:video');
+        $this->writer->writeElement('video:thumbnail_loc', $video->thumbnailLoc);
+        $this->writer->writeElement('video:title', $video->title);
+        $this->writer->writeElement('video:description', $video->description);
+
+        if ($video->contentLoc !== null) {
+            $this->writer->writeElement('video:content_loc', $video->contentLoc);
+        }
+
+        if ($video->playerLoc !== null) {
+            $this->writer->writeElement('video:player_loc', $video->playerLoc);
+        }
+
+        if ($video->durationSeconds !== null) {
+            $this->writer->writeElement('video:duration', (string) $video->durationSeconds);
+        }
+
+        if ($video->publicationDate !== null) {
+            $this->writer->writeElement(
+                'video:publication_date',
+                $video->publicationDate->format(DateTimeInterface::ATOM),
+            );
+        }
+
+        if ($video->familyFriendly !== null) {
+            $this->writer->writeElement('video:family_friendly', $video->familyFriendly ? 'yes' : 'no');
+        }
+
+        $this->writer->endElement();
+    }
+
+    private function writeNews(SitemapNews $news): void
+    {
+        $this->writer->startElement('news:news');
+
+        $this->writer->startElement('news:publication');
+        $this->writer->writeElement('news:name', $news->publicationName);
+        $this->writer->writeElement('news:language', $news->publicationLanguage);
+        $this->writer->endElement();
+
+        $this->writer->writeElement('news:publication_date', $news->publicationDate->format(DateTimeInterface::ATOM));
+        $this->writer->writeElement('news:title', $news->title);
+
+        if ($news->genres !== null) {
+            $this->writer->writeElement('news:genres', $news->genres);
+        }
+
+        if ($news->keywords !== null) {
+            $this->writer->writeElement('news:keywords', $news->keywords);
+        }
+
+        $this->writer->endElement();
     }
 
     public function writeSitemapReference(string $loc, ?DateTimeInterface $lastModified = null): self

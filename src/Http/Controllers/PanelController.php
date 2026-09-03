@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Http\Controllers;
 
 use Duxbo\Seo\Http\Concerns\ResolvesExposedModel;
+use Duxbo\Seo\Http\Concerns\WarnsAboutDuplicates;
 use Duxbo\Seo\Seo;
 use Duxbo\Seo\Support\SameOriginUrls;
 use Illuminate\Http\JsonResponse;
@@ -25,6 +26,7 @@ use Illuminate\View\View;
 final class PanelController
 {
     use ResolvesExposedModel;
+    use WarnsAboutDuplicates;
 
     public function __construct(
         private readonly Seo $seo,
@@ -103,7 +105,10 @@ final class PanelController
 
         $this->seo->save($model, $dotted, $locale);
 
-        return response()->json(['resolved' => $this->seo->for($model, $locale)->toArray()]);
+        return response()->json([
+            'resolved' => $this->seo->for($model, $locale)->toArray(),
+            'warnings' => $this->duplicateWarnings($this->seo, $model, $dotted, $locale),
+        ]);
     }
 
     public function analyze(Request $request, string $type, string $id): JsonResponse
