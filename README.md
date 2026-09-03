@@ -150,13 +150,56 @@ it must lock the door rather than open it.
 
 | | |
 |---|---|
-| PHP | 8.1 – 8.5 |
-| Laravel | 9, 10, 11, 12, 13 |
+| PHP | 8.2 – 8.4 (tested) |
+| Laravel | 12, 13 (tested) |
 | Extensions | `dom`, `json`, `libxml` (`intl` optional, with a fallback) |
 
-PHP 8.1 rather than 8.0 buys enums, readonly properties, `never`, first-class
-callables and pure intersection types — all of which this package's design
-leans on. PHP 8.0 reached end of life in November 2023.
+### About Laravel 9, 10 and 11
+
+The Composer constraint still admits them, and the compatibility layer still
+carries their code paths — but they are **not tested, and in practice not
+installable**.
+
+All three are past their security end-of-life (February 2024, February 2025 and
+March 2026), and every published release now carries unpatched advisories.
+Composer treats that as a hard resolver failure, not a warning:
+
+```
+- orchestra/testbench v7.57.0 requires laravel/framework ^9.52.21
+  -> found laravel/framework[v9.52.21, v9.52.22] but these were not loaded,
+     because they are affected by security advisories
+```
+
+A CI row for those versions would prove only that Composer's security policy can
+be switched off. If you are locked to one of them and have already made that
+decision for your own project, the package will very likely work — but nothing
+here verifies it.
+
+PHP 8.1 remains the language floor because the design leans on enums, readonly
+properties, `never`, first-class callables and pure intersection types. In
+practice Laravel 12 requires 8.2, so 8.2 is the effective minimum.
+
+## Testing
+
+The suite runs against every supported combination inside throwaway Docker
+containers, so nothing has to be installed on the machine:
+
+```bash
+docker/matrix.sh            # whole matrix
+docker/matrix.sh 13         # one Laravel major
+docker/matrix.sh --clean    # remove the built images
+```
+
+The source is mounted read-only and copied inside the container, so the host's
+`vendor/` and `composer.lock` are never touched.
+
+```
+  PASS  Laravel 12 · PHP 8.2    OK (147 tests, 272 assertions)
+  PASS  Laravel 12 · PHP 8.3    OK (147 tests, 272 assertions)
+  PASS  Laravel 12 · PHP 8.4    OK (147 tests, 272 assertions)
+  PASS  Laravel 13 · PHP 8.3    OK (147 tests, 272 assertions)
+  PASS  Laravel 13 · PHP 8.4    OK (147 tests, 272 assertions)
+```
 
 ## Design rules
 

@@ -17,16 +17,17 @@ jobs:
         # Spelled out rather than built with excludes: each row states the
         # Testbench release that pairs with that Laravel major, which is the
         # thing that actually has to be right.
+        #
+        # Laravel 9, 10 and 11 have no rows. All three are past security EOL,
+        # every published release carries unpatched advisories, and Composer
+        # refuses to resolve them — so such a row would only prove that we can
+        # switch Composer's security policy off.
         include:
-          - { laravel: 9,  php: '8.1', testbench: '^7.0'  }
-          - { laravel: 10, php: '8.1', testbench: '^8.0'  }
-          - { laravel: 10, php: '8.3', testbench: '^8.0'  }
-          - { laravel: 11, php: '8.2', testbench: '^9.0'  }
-          - { laravel: 11, php: '8.4', testbench: '^9.0'  }
           - { laravel: 12, php: '8.2', testbench: '^10.0' }
-          - { laravel: 12, php: '8.5', testbench: '^10.0' }
+          - { laravel: 12, php: '8.3', testbench: '^10.0' }
+          - { laravel: 12, php: '8.4', testbench: '^10.0' }
           - { laravel: 13, php: '8.3', testbench: '^11.0' }
-          - { laravel: 13, php: '8.5', testbench: '^11.0' }
+          - { laravel: 13, php: '8.4', testbench: '^11.0' }
 
     steps:
       - uses: actions/checkout@v4
@@ -66,18 +67,18 @@ jobs:
 
   lowest:
     runs-on: ubuntu-latest
-    name: L9 · PHP 8.1 · lowest deps
+    name: L12 · PHP 8.2 · lowest deps
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.2'
           extensions: dom, json, libxml, intl, sqlite3
           coverage: none
 
       - run: |
-          composer require --dev --no-update "orchestra/testbench:^7.0"
+          composer require --dev --no-update "orchestra/testbench:^10.0"
           composer update --prefer-dist --prefer-lowest --no-interaction --no-progress
       - run: vendor/bin/phpunit
