@@ -66,6 +66,33 @@ final class Text
     }
 
     /**
+     * Whether this text is written in a script where whitespace marks word
+     * boundaries — true for Latin and Vietnamese, false for Chinese,
+     * Japanese and Thai, which run letters together with no separator at
+     * all. Splitting on whitespace against one of those scripts collapses
+     * an entire article into a handful of "words" (a run of punctuation, a
+     * stray Latin brand name), which is what {@see \Duxbo\Seo\Analysis\Tokenizer}
+     * uses this to avoid.
+     *
+     * Decided by which kind of letter is more common in the text, not merely
+     * present — a Vietnamese article quoting a Chinese proper noun once must
+     * not flip the whole count to character-based.
+     */
+    public static function isSpaceDelimitedScript(string $value): bool
+    {
+        $letters = preg_match_all('/\p{L}/u', $value);
+
+        if ($letters === false || $letters === 0) {
+            return true;
+        }
+
+        $noSpaceScript = preg_match_all('/[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}\p{Thai}]/u', $value);
+        $noSpaceScript = $noSpaceScript === false ? 0 : $noSpaceScript;
+
+        return ($noSpaceScript / $letters) < 0.5;
+    }
+
+    /**
      * Strip Vietnamese diacritics, for accent-insensitive comparison.
      *
      * Many people search without diacritics, so a keyword check that only

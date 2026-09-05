@@ -11,8 +11,18 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * A redirect rule.
  *
- * Saving goes through {@see RedirectRepository} rather than the model directly,
- * so the safety checks cannot be bypassed by writing a row by hand.
+ * {@see RedirectRepository} is still the intended way to write one — it
+ * normalises the source path and flushes the matcher cache, which a bare
+ * `save()` does not. What it no longer has a monopoly on is *safety*: a
+ * `saving` hook below re-runs {@see RedirectGuard} through
+ * {@see RedirectSaveGuard} whenever a column the checks care about is dirty,
+ * so a hand-written row — a seeder, `Redirect::create()` in tinker, an
+ * integration that never learned the repository exists — cannot store an
+ * unsafe target or a loop either. The one path this cannot close is a raw
+ * query-builder write (`Redirect::query()->update(...)`,
+ * `DB::table(...)->update(...)`): Eloquent never fires model events for
+ * those, on this model or any other, which is why {@see RedirectRepository}
+ * itself no longer uses them (see its `disable()`/`setActive()`/`delete()`).
  *
  * @property string $source_path
  * @property string $source_hash
@@ -26,6 +36,22 @@ use Illuminate\Database\Eloquent\Model;
 final class Redirect extends Model
 {
     protected $guarded = [];
+
+    /**
+     * @var list<string>
+     */
+    private const GUARDED_COLUMNS = ['source_path', 'source_type', 'target', 'status_code', 'is_active'];
+
+    protected static function booted(): void
+    {
+        static::saving(static function (self $redirect): void {
+            if (! $redirect->isDirty(self::GUARDED_COLUMNS)) {
+                return;
+            }
+
+            app(RedirectSaveGuard::class)->assertSafe($redirect);
+        });
+    }
 
     /**
      * @var array<string, string>

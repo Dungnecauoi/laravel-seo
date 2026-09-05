@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Settings;
 
 use Duxbo\Seo\Contracts\ResetsBetweenRequests;
+use Duxbo\Seo\Exceptions\InvalidSettingValue;
 use Duxbo\Seo\Exceptions\UnknownSetting;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Config\Repository as Config;
@@ -39,6 +40,7 @@ final class SettingsRepository implements ResetsBetweenRequests
     public function __construct(
         private readonly Cache $cache,
         private readonly Config $config,
+        private readonly SettingValidatorRegistry $validators,
     ) {
     }
 
@@ -120,10 +122,11 @@ final class SettingsRepository implements ResetsBetweenRequests
 
     /**
      * @throws UnknownSetting
+     * @throws InvalidSettingValue
      */
     public function set(string $key, mixed $value): void
     {
-        $this->assertAllowed($key);
+        $this->assertValid($key, $value);
 
         DB::table($this->table())->updateOrInsert(
             ['key' => $key],
@@ -178,6 +181,22 @@ final class SettingsRepository implements ResetsBetweenRequests
     public function resetForNewRequest(): void
     {
         $this->applyToConfig();
+    }
+
+    /**
+     * Checks a key/value pair without writing it — the allowlist and the
+     * per-key shape check both run here, so a caller (the API controller,
+     * an AI tool) can validate a whole batch before committing any of it,
+     * the same all-or-nothing guarantee {@see set()} itself relies on this
+     * for.
+     *
+     * @throws UnknownSetting
+     * @throws InvalidSettingValue
+     */
+    public function assertValid(string $key, mixed $value): void
+    {
+        $this->assertAllowed($key);
+        $this->validators->assertValid($key, $value);
     }
 
     private function assertAllowed(string $key): void

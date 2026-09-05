@@ -48,4 +48,31 @@ final class TextTest extends TestCase
     {
         $this->assertSame('tiếng việt', Text::lower('Tiếng Việt'));
     }
+
+    public function test_vietnamese_and_english_are_space_delimited(): void
+    {
+        $this->assertTrue(Text::isSpaceDelimitedScript('Tiếng Việt rất hay.'));
+        $this->assertTrue(Text::isSpaceDelimitedScript('The quick brown fox.'));
+    }
+
+    public function test_chinese_japanese_and_thai_are_not_space_delimited(): void
+    {
+        $this->assertFalse(Text::isSpaceDelimitedScript('这是一篇关于搜索引擎优化的文章'));
+        $this->assertFalse(Text::isSpaceDelimitedScript('これは日本語のテキストです'));
+        $this->assertFalse(Text::isSpaceDelimitedScript('นี่คือข้อความภาษาไทย'));
+    }
+
+    public function test_a_stray_foreign_word_does_not_flip_the_dominant_script(): void
+    {
+        // One quoted Chinese proper noun in an otherwise Vietnamese article
+        // must not switch the whole piece to character counting.
+        $this->assertTrue(Text::isSpaceDelimitedScript(
+            'Bài báo nhắc đến thành phố 北京 trong đoạn mở đầu, rồi tiếp tục bằng tiếng Việt.',
+        ));
+    }
+
+    public function test_text_with_no_letters_at_all_defaults_to_space_delimited(): void
+    {
+        $this->assertTrue(Text::isSpaceDelimitedScript('123 456 !!! ***'));
+    }
 }

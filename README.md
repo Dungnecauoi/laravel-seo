@@ -368,6 +368,14 @@ same class of mistake as an open redirect, just quieter. Add a host to
 between redirect targets and canonical URLs, since both are the same trust
 boundary.
 
+A separate check, `Canonical\CanonicalGuard`, runs inside `Seo::save()`
+itself — regardless of whether the write came through the API, the panel, or
+plain PHP — and refuses a canonical that would cycle back to the page it
+started from (A → B → A). It stays a no-op until an application binds a real
+`Contracts\CanonicalResolver` (the default answers "unknown" for every URL),
+since unlike a redirect rule, an arbitrary canonical target has no
+guaranteed way back to the record that owns it.
+
 ### Content analysis
 
 ```php
@@ -382,6 +390,14 @@ rather than producing a confident number that means nothing. In their place:
 sentence length in syllables, `được`/`bị` passive markers, and keyword matching
 that normalises Unicode first — "tiếng" has two spellings that look identical
 and would not otherwise compare equal.
+
+Length and density checks measure by counting letters instead of
+whitespace-separated tokens for Chinese, Japanese and Thai content — those
+scripts don't put spaces between words, and a whitespace split would
+otherwise collapse a full article into a single "word."
+`Support\Text::isSpaceDelimitedScript()` decides which counting the content
+in front of it needs, by which kind of letter is actually dominant, so one
+quoted foreign word doesn't flip an otherwise-Vietnamese page.
 
 ### Duplicate titles and descriptions
 
@@ -459,7 +475,13 @@ repository; every existing consumer picks it up simply because it was
 already reading `config()`. Only the dot-notated keys listed in
 `seo.settings.keys` can ever be written this way — the same reasoning
 behind `seo.api.models` allowlisting which model types the API can touch,
-rather than accepting any key a caller names.
+rather than accepting any key a caller names. Each of those keys also has a
+`Contracts\SettingValueValidator` registered under `seo.settings.validators`
+checking the *value*, not just that the key was expected — a boolean setting
+rejects a non-boolean, a URL setting rejects `javascript:` and anything
+without a real host, and so on. A batch `PUT` validates every key before
+writing any of them, the same all-or-nothing guarantee the allowlist check
+itself gives.
 
 `seo.settings.secret_keys` — a subset of the above, currently
 `search_console.client_secret` and `search_console.refresh_token` — are

@@ -65,7 +65,8 @@ final class RedirectRepository
         Redirect::query()
             ->where('source_hash', md5($this->guard->normalise($source)))
             ->where('locale', $locale)
-            ->delete();
+            ->get()
+            ->each(static fn (Redirect $redirect) => $redirect->delete());
 
         $this->matcher->flush();
     }
@@ -75,7 +76,11 @@ final class RedirectRepository
         Redirect::query()
             ->where('source_hash', md5($this->guard->normalise($source)))
             ->where('locale', $locale)
-            ->update(['is_active' => false]);
+            ->get()
+            ->each(static function (Redirect $redirect): void {
+                $redirect->is_active = false;
+                $redirect->save();
+            });
 
         $this->matcher->flush();
     }
@@ -83,17 +88,27 @@ final class RedirectRepository
     /**
      * Toggle by row id — what a table of existing rules operates on, rather
      * than reconstructing the normalised source path to look one up again.
+     *
+     * Fetches the model and calls `save()` rather than a bulk `update()`
+     * query so that re-enabling a rule re-runs {@see Redirect}'s `saving`
+     * guard — a rule disabled while safe can otherwise be flipped back on
+     * into a loop formed by other rules that changed while it sat inactive.
      */
     public function setActive(int $id, bool $active): void
     {
-        Redirect::query()->whereKey($id)->update(['is_active' => $active]);
+        $redirect = Redirect::query()->find($id);
+
+        if ($redirect !== null) {
+            $redirect->is_active = $active;
+            $redirect->save();
+        }
 
         $this->matcher->flush();
     }
 
     public function deleteById(int $id): void
     {
-        Redirect::query()->whereKey($id)->delete();
+        Redirect::query()->find($id)?->delete();
 
         $this->matcher->flush();
     }

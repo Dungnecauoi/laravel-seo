@@ -5,16 +5,18 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Analysis\Checks\Universal;
 
 use Duxbo\Seo\Analysis\Checks\Check;
+use Duxbo\Seo\Analysis\Tokenizer;
 use Duxbo\Seo\Analysis\Vietnamese;
 use Duxbo\Seo\Data\AnalysisContext;
 use Duxbo\Seo\Data\CheckResult;
 
 /**
- * Density measured by syllables occupied, not by occurrence count.
- *
- * Counting occurrences would treat a three-syllable phrase the same as a single
- * word, and under-report every multi-word keyword — which in Vietnamese is most
- * of them.
+ * Density measured by the share of the text a keyword occupies, not by
+ * occurrence count — counting occurrences would treat a three-syllable
+ * phrase the same as a single word, and under-report every multi-word
+ * keyword. {@see Tokenizer} supplies both the total and the keyword's own
+ * length so the ratio stays meaningful for a script with no whitespace
+ * between words, not only for Vietnamese and English.
  */
 final class KeywordDensity extends Check
 {
@@ -41,7 +43,7 @@ final class KeywordDensity extends Check
         }
 
         $text = $context->content->plainText;
-        $total = Vietnamese::syllableCount($text);
+        $total = Tokenizer::count($text);
 
         // Too short for a density figure to mean anything.
         if ($total < 50) {
@@ -49,7 +51,7 @@ final class KeywordDensity extends Check
         }
 
         $keyword = (string) $context->focusKeyword;
-        $keywordLength = max(1, Vietnamese::syllableCount($keyword));
+        $keywordLength = max(1, Tokenizer::count($keyword));
         $occurrences = Vietnamese::phraseCount($text, $keyword);
 
         $density = ($occurrences * $keywordLength) / $total * 100;

@@ -89,6 +89,45 @@ final class AnalysisTest extends TestCase
         $this->assertGreaterThan(0, $density);
     }
 
+    public function test_content_length_uses_character_count_for_a_script_with_no_word_spaces(): void
+    {
+        // A whitespace split sees this whole block as a single "word" (there
+        // is no whitespace anywhere in Chinese prose), which used to make
+        // content-length report "too short" no matter how much was written.
+        $paragraph = str_repeat('这是一篇关于搜索引擎优化的详细文章介绍网站建设的重要内容', 40);
+
+        $report = $this->analyze("<h1>标题</h1><p>{$paragraph}</p>", null, locale: 'zh');
+
+        $this->assertSame(CheckStatus::Pass, $this->checkResult($report, 'content-length')->status);
+    }
+
+    public function test_content_length_still_warns_on_genuinely_short_chinese_content(): void
+    {
+        $report = $this->analyze('<p>这是一个很短的介绍</p>', null, locale: 'zh');
+
+        $this->assertSame(CheckStatus::Warning, $this->checkResult($report, 'content-length')->status);
+    }
+
+    public function test_keyword_density_stays_meaningful_for_a_script_with_no_word_spaces(): void
+    {
+        // Everything except one occurrence of the keyword: real density here
+        // is low. Whitespace-splitting the whole block into one "word" used
+        // to make density's denominator collapse to 1, reporting an
+        // impossible four-figure percentage for a single occurrence — this
+        // asserts the figure stays in a sane range instead.
+        $filler = str_repeat('网站建设需要注意用户体验和页面加载速度等多个方面', 30);
+
+        $report = $this->analyze(
+            "<h1>标题</h1><p>{$filler}搜索引擎优化{$filler}</p>",
+            '搜索引擎优化',
+            locale: 'zh',
+        );
+
+        $density = $this->checkResult($report, 'keyword-density')->context['density'];
+
+        $this->assertLessThan(5.0, $density);
+    }
+
     public function test_a_missing_alt_attribute_is_reported(): void
     {
         $report = $this->analyze('<p>Xin chào</p><img src="/a.jpg"><img src="/b.jpg" alt="Có mô tả">');

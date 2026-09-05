@@ -15,6 +15,7 @@ use Duxbo\Seo\Console\InternalLinksCommand;
 use Duxbo\Seo\Console\PruneNotFoundCommand;
 use Duxbo\Seo\Console\SearchConsoleSyncCommand;
 use Duxbo\Seo\Console\SitemapCommand;
+use Duxbo\Seo\Contracts\CanonicalResolver;
 use Duxbo\Seo\Contracts\ContentExtractor;
 use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\MetadataRepository;
@@ -74,6 +75,7 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(SchemaNormalizer::class);
         $this->app->singleton(SchemaValidator::class);
         $this->app->singleton(Redirects\RedirectGuard::class);
+        $this->app->singleton(Canonical\CanonicalGuard::class);
         $this->app->singleton(NotFound\NotFoundLogger::class);
         $this->app->singleton(Robots\RobotsTxt::class);
         $this->app->singleton(Ai\AiBudget::class);
@@ -89,6 +91,7 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(MetadataRepository::class, EloquentMetadataRepository::class);
         $this->app->singleton(ContentExtractor::class, DomContentExtractor::class);
         $this->app->singleton(RedirectMatcher::class, CachedRedirectMatcher::class);
+        $this->app->singleton(CanonicalResolver::class, Canonical\NullCanonicalResolver::class);
 
         $this->registerTokens();
         $this->registerResolver();
@@ -420,6 +423,7 @@ final class SeoServiceProvider extends ServiceProvider
                 $app->make(Ai\AiManager::class),
                 $app->make(UrlGenerator::class),
                 $app->make(Dispatcher::class),
+                $app->make(Canonical\CanonicalGuard::class),
             );
 
             $head = $app->make(HeadFormatter::class);

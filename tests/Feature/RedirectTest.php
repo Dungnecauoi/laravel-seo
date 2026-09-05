@@ -7,6 +7,7 @@ namespace Duxbo\Seo\Tests\Feature;
 use Duxbo\Seo\Enums\RedirectMatchType;
 use Duxbo\Seo\Enums\RedirectType;
 use Duxbo\Seo\Exceptions\UnsafeRedirect;
+use Duxbo\Seo\Redirects\Redirect;
 use Duxbo\Seo\Redirects\RedirectRepository;
 use Duxbo\Seo\Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -147,6 +148,63 @@ final class RedirectTest extends TestCase
         $this->redirects()->disable('/cu');
 
         $this->get('/cu')->assertNotFound();
+    }
+
+    public function test_writing_a_row_directly_through_eloquent_still_refuses_an_unsafe_target(): void
+    {
+        // RedirectRepository::create() is the intended entry point, but
+        // nothing stops a seeder or a careless integration from calling
+        // Redirect::create() straight — the model's own `saving` guard is
+        // what actually closes that gap, not the repository alone.
+        $this->expectException(UnsafeRedirect::class);
+        $this->expectExceptionMessageMatches('/phishing/');
+
+        Redirect::create([
+            'source_path' => '/khuyen-mai-2',
+            'source_hash' => md5('/khuyen-mai-2'),
+            'source_type' => RedirectMatchType::Exact,
+            'target' => 'https://trang-lua-dao.com',
+            'status_code' => RedirectType::MovedPermanently,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_writing_a_row_directly_through_eloquent_still_refuses_a_loop(): void
+    {
+        $this->redirects()->create('/a', '/b');
+
+        $this->expectException(UnsafeRedirect::class);
+        $this->expectExceptionMessageMatches('/loop/');
+
+        Redirect::create([
+            'source_path' => '/b',
+            'source_hash' => md5('/b'),
+            'source_type' => RedirectMatchType::Exact,
+            'target' => '/a',
+            'status_code' => RedirectType::MovedPermanently,
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_re_enabling_a_disabled_rule_refuses_a_loop_formed_while_it_was_off(): void
+    {
+        $rule = $this->redirects()->create('/x', '/y');
+        $this->redirects()->disable('/x');
+
+        // With /x safely inactive, /y -> /x no longer loops back to anything
+        // live, so this second rule is allowed to point at it.
+        $this->redirects()->create('/y', '/x');
+
+        // Re-enabling /x now closes /x -> /y -> /x -> ... and must be refused,
+        // not silently restored the way a bulk `update()` used to allow.
+        $this->expectException(UnsafeRedirect::class);
+        $this->expectExceptionMessageMatches('/loop/');
+
+        try {
+            $this->redirects()->setActive($rule->id, true);
+        } finally {
+            $this->assertFalse($rule->fresh()->is_active);
+        }
     }
 
     public function test_hits_are_counted(): void

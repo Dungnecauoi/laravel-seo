@@ -6,6 +6,7 @@ namespace Duxbo\Seo;
 
 use Duxbo\Seo\Ai\AiManager;
 use Duxbo\Seo\Analysis\Analyzer;
+use Duxbo\Seo\Canonical\CanonicalGuard;
 use Duxbo\Seo\Contracts\AnalysisCheck;
 use Duxbo\Seo\Contracts\HasBreadcrumbs;
 use Duxbo\Seo\Contracts\LocaleResolver;
@@ -50,6 +51,7 @@ final class Seo
         private readonly AiManager $ai,
         private readonly UrlGenerator $urls,
         private readonly Dispatcher $events,
+        private readonly CanonicalGuard $canonicalGuard,
     ) {
     }
 
@@ -145,13 +147,18 @@ final class Seo
      */
     public function save(Seoable $model, SeoData|array $data, ?string $locale = null): void
     {
-        $this->repository->save(
-            $model,
-            is_array($data) ? SeoDataBuilder::fromDotted($data) : $data,
-            $locale,
-        );
+        $data = is_array($data) ? SeoDataBuilder::fromDotted($data) : $data;
+        $subjectUrl = $this->safeUrl($model, $locale);
 
-        $this->events->dispatch(new SeoMetaSaved($model, $locale, $this->safeUrl($model, $locale)));
+        // A no-op unless the application has bound a real CanonicalResolver —
+        // see its docblock for why this can only be a best-effort check.
+        if ($subjectUrl !== null && $data->canonical !== null) {
+            $this->canonicalGuard->assertNoCycle($subjectUrl, $data->canonical);
+        }
+
+        $this->repository->save($model, $data, $locale);
+
+        $this->events->dispatch(new SeoMetaSaved($model, $locale, $subjectUrl));
     }
 
     /**

@@ -11,6 +11,65 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Fixed — five robustness gaps found by an edge-case audit
+
+- **Dynamic settings never validated the *value* being written**, only that
+  the key was allowlisted. Concretely: `AiBudget::assertWithinBudget()`
+  treated any limit `<= 0` as "unlimited," so a negative
+  `ai.daily_token_budget` — written to *restrict* spend — silently disabled
+  the cap instead; fixed so only an exact `0` means unlimited and a negative
+  value fails closed. A new `Contracts\SettingValueValidator` plus one
+  validator per allowlisted key (`seo.settings.validators`) closes the
+  general gap: booleans must be booleans, URLs must be `http(s)` with a real
+  host, `defaults.twitter.card` must be one `TwitterCard` actually defines,
+  and `indexnow.key` is restricted to a route-safe charset — the value is
+  embedded directly as a literal `Route::get($key.'.txt', ...)` segment, and
+  a `{`/`}` in it would register a *dynamic* route parameter that matches
+  any path in that position instead of the intended fixed one.
+  `DynamicSettingsController::update()` now validates every key in a batch
+  before writing any of them, the same all-or-nothing guarantee it already
+  gave the allowlist check. A structural test asserts every entry in
+  `seo.settings.keys` has a matching validator, so adding a key without one
+  is a build failure, not a silent gap.
+- **A redirect rule wasn't actually safe from every angle it claimed to
+  be.** `Redirect`'s own docblock said hand-writing a row couldn't bypass
+  `RedirectGuard`'s checks, but nothing enforced that — a seeder or
+  `Redirect::create()` called directly skipped every check `RedirectRepository`
+  runs. A `saving` model hook now re-runs them whenever a guarded column is
+  dirty. Relatedly, `RedirectRepository::setActive()` re-enabled a rule with
+  a bulk `update()` query, which never re-checked for a loop that could have
+  formed from *other* rules changing while this one sat disabled;
+  `disable()`, `setActive()` and `deleteById()` now fetch the model and call
+  `save()`/`delete()` so the hook actually runs. (A raw query-builder mass
+  update still bypasses it — Eloquent never fires model events for those, on
+  this model or any other; the docblock now says so precisely instead of
+  overclaiming.)
+- **No canonical cycle detection.** Redirects have always refused a loop at
+  write time; a canonical tag pointing A → B → A had nothing stopping it.
+  Added `Canonical\CanonicalGuard`, wired into `Seo::save()`, with one case
+  handled explicitly before anything else: a page canonicalizing to *itself*
+  is the normal, correct case, not a cycle. Unlike a redirect rule, an
+  arbitrary canonical URL has no guaranteed way back to the record that owns
+  it, so the check is real but necessarily partial — it walks through a new
+  `Contracts\CanonicalResolver`, bound by default to `NullCanonicalResolver`
+  (always answers "unknown," a safe no-op). An application that can map its
+  own URLs back to a record can bind a real resolver to turn the check on.
+- **Content analysis broke on Chinese, Japanese and Thai.** `ContentLength`
+  and `KeywordDensity` measured text by splitting on whitespace — exactly
+  right for Vietnamese and a reasonable proxy for English, both of which
+  actually separate words with spaces. Those three scripts don't: a whole
+  article with no whitespace at all collapsed to a single "word," making
+  content-length report "too short" no matter how much was written and
+  keyword-density compute an impossible figure off a denominator of one. A
+  new `Support\Text::isSpaceDelimitedScript()` detects which situation the
+  text is in (by which kind of letter is *dominant*, so one quoted foreign
+  word doesn't flip an otherwise-Vietnamese article), and `Analysis\Tokenizer`
+  switches to counting letters instead of whitespace tokens when it isn't.
+  `ContentLength` gets its own, explicitly heuristic
+  `seo.analysis.content_length_cjk_minimum` (default 800) for the
+  character-counted case, since a syllable-based threshold tuned for
+  Vietnamese has no meaningful conversion to a character count.
+
 ### Added
 
 - **Metadata** — polymorphic storage behind a swappable repository, a

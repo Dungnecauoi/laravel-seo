@@ -281,6 +281,41 @@ final class AiTest extends TestCase
         $this->ai()->complete($this->request(), 'claude');
     }
 
+    public function test_a_negative_daily_budget_fails_closed_instead_of_being_read_as_unlimited(): void
+    {
+        // `<= 0` used to mean "unlimited," so a negative value written to
+        // *restrict* spend (a bad .env value, or an unvalidated dynamic
+        // settings write before InvalidSettingValue existed) silently
+        // disabled the cap instead. Only an exact 0 means unlimited now.
+        config(['seo.ai.daily_token_budget' => -1]);
+
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => ['title' => 'x']]],
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])]);
+
+        $this->expectException(AiRequestFailed::class);
+        $this->expectExceptionMessageMatches('/budget is spent/');
+
+        $this->ai()->complete($this->request(), 'claude');
+    }
+
+    public function test_a_zero_daily_budget_still_means_unlimited(): void
+    {
+        config(['seo.ai.daily_token_budget' => 0]);
+
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => ['title' => 'x']]],
+            'usage' => ['input_tokens' => 1_000_000, 'output_tokens' => 1_000_000],
+        ])]);
+
+        $response = $this->ai()->complete($this->request(), 'claude');
+
+        $this->assertSame('x', $response->get('title'));
+    }
+
     public function test_the_same_content_is_never_billed_twice(): void
     {
         config(['seo.ai.cache_ttl' => 3600]);

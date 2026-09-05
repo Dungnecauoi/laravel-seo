@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Tests\Feature;
 
+use Duxbo\Seo\Exceptions\InvalidSettingValue;
 use Duxbo\Seo\Exceptions\UnknownSetting;
 use Duxbo\Seo\Settings\SettingsRepository;
 use Duxbo\Seo\Tests\Fixtures\Post;
@@ -86,6 +87,62 @@ final class DynamicSettingsTest extends TestCase
 
         $this->assertTrue(config('seo.robots.block_ai_crawlers'));
         $this->assertTrue($this->repo()->get('robots.block_ai_crawlers'));
+    }
+
+    public function test_a_boolean_setting_rejects_a_non_boolean_value(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        // json_decode gives back a string here, not the loose PHP truthiness
+        // config('seo.*') === true comparisons throughout the package expect.
+        $this->repo()->set('robots.block_ai_crawlers', 'true');
+    }
+
+    public function test_a_url_setting_rejects_a_non_http_scheme(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('schema.organization.logo', 'javascript:alert(1)');
+    }
+
+    public function test_a_url_list_setting_rejects_one_bad_entry_in_an_otherwise_valid_list(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('schema.organization.sameAs', [
+            'https://twitter.com/example',
+            'not-a-url',
+        ]);
+    }
+
+    public function test_a_twitter_card_setting_rejects_a_value_the_enum_does_not_define(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('defaults.twitter.card', 'summary_extra_huge');
+    }
+
+    public function test_an_indexnow_key_rejects_characters_that_would_corrupt_the_route(): void
+    {
+        // A "{" registers a *dynamic* route parameter instead of the literal
+        // path this key is meant to be — see IndexNowKeyValidator's docblock.
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('indexnow.key', '{evil}');
+    }
+
+    public function test_a_valid_indexnow_key_is_accepted(): void
+    {
+        $this->repo()->set('indexnow.key', 'a1b2c3d4e5f6');
+
+        $this->assertSame('a1b2c3d4e5f6', config('seo.indexnow.key'));
+    }
+
+    public function test_setting_a_value_to_null_is_still_allowed_for_a_nullable_string_setting(): void
+    {
+        $this->repo()->set('verification.google', null);
+
+        $this->assertNull(config('seo.verification.google'));
     }
 
     private function repo(): SettingsRepository

@@ -30,8 +30,16 @@ final class AiBudget
     {
         $limit = (int) $this->config->get('seo.ai.daily_token_budget', 0);
 
-        if ($limit <= 0) {
+        if ($limit === 0) {
             return;
+        }
+
+        // A negative limit can only reach here through a bad .env value or a
+        // dynamic-settings write with no shape validation of its own — either
+        // way it was written to *restrict* spend, so it must fail closed
+        // rather than be read as "no limit" the way `<= 0` used to treat it.
+        if ($limit < 0) {
+            throw AiRequestFailed::budgetExceeded($this->tokensUsedToday(), $limit);
         }
 
         $used = $this->tokensUsedToday();

@@ -9,6 +9,13 @@ use Duxbo\Seo\Resolution\Stages\StoredValueStage;
 use Duxbo\Seo\Resolution\Stages\TemplateStage;
 use Duxbo\Seo\Resolution\Stages\TokenExpansionStage;
 use Duxbo\Seo\Resolution\Stages\TruncateStage;
+use Duxbo\Seo\Settings\Validators\BooleanSettingValidator;
+use Duxbo\Seo\Settings\Validators\IndexNowKeyValidator;
+use Duxbo\Seo\Settings\Validators\SearchConsoleCredentialValidator;
+use Duxbo\Seo\Settings\Validators\StringSettingValidator;
+use Duxbo\Seo\Settings\Validators\TwitterCardSettingValidator;
+use Duxbo\Seo\Settings\Validators\UrlListSettingValidator;
+use Duxbo\Seo\Settings\Validators\UrlSettingValidator;
 
 /*
 |--------------------------------------------------------------------------
@@ -528,6 +535,38 @@ return [
             'search_console.client_secret',
             'search_console.refresh_token',
         ],
+
+        // One validator per key above, checking shape rather than just
+        // presence — the allowlist only ever proved a key was *expected*,
+        // never that a written value was safe to push into live config.
+        // tests/Feature/SettingsAllowlistHasValidatorsTest.php fails the
+        // build if a key is added above without a matching entry here.
+        'validators' => [
+            'enabled' => BooleanSettingValidator::class,
+            'site_name' => StringSettingValidator::class,
+            'defaults.title' => StringSettingValidator::class,
+            'defaults.description' => StringSettingValidator::class,
+            'defaults.robots' => StringSettingValidator::class,
+            'defaults.og.site_name' => StringSettingValidator::class,
+            'defaults.twitter.card' => TwitterCardSettingValidator::class,
+            'verification.google' => StringSettingValidator::class,
+            'verification.bing' => StringSettingValidator::class,
+            'verification.yandex' => StringSettingValidator::class,
+            'verification.pinterest' => StringSettingValidator::class,
+            'verification.facebook' => StringSettingValidator::class,
+            'robots.block_ai_crawlers' => BooleanSettingValidator::class,
+            'schema.organization.name' => StringSettingValidator::class,
+            'schema.organization.logo' => UrlSettingValidator::class,
+            'schema.organization.sameAs' => UrlListSettingValidator::class,
+            'schema.website.search_url' => UrlSettingValidator::class,
+            'indexnow.enabled' => BooleanSettingValidator::class,
+            'indexnow.key' => IndexNowKeyValidator::class,
+            'search_console.enabled' => BooleanSettingValidator::class,
+            'search_console.client_id' => StringSettingValidator::class,
+            'search_console.client_secret' => SearchConsoleCredentialValidator::class,
+            'search_console.refresh_token' => SearchConsoleCredentialValidator::class,
+            'search_console.site_url' => UrlSettingValidator::class,
+        ],
     ],
 
     /*
@@ -763,6 +802,18 @@ return [
 
         // 'keyword-density' => 5
         'weights' => [],
+
+        // ContentLength's own $minimum (600) is syllables, tuned for
+        // Vietnamese and English — both mark word boundaries with
+        // whitespace. Chinese, Japanese and Thai do not, so the same check
+        // measures those in *letters* instead once it detects one of those
+        // scripts (see Text::isSpaceDelimitedScript()), and needs a
+        // differently-scaled threshold for that unit. There is no
+        // established word-to-character conversion this number is derived
+        // from — like Analysis\Vietnamese's own readability measures, this
+        // is a heuristic, not a validated instrument, and worth tuning for
+        // whichever of those languages a real site actually publishes in.
+        'content_length_cjk_minimum' => 800,
 
         /*
         | Analysis runs real work per request — DOMDocument parsing plus every

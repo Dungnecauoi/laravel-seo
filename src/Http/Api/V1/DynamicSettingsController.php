@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Http\Api\V1;
 
+use Duxbo\Seo\Exceptions\InvalidSettingValue;
 use Duxbo\Seo\Exceptions\UnknownSetting;
 use Duxbo\Seo\Settings\SettingsRepository;
 use Illuminate\Http\JsonResponse;
@@ -73,13 +74,14 @@ final class DynamicSettingsController extends ApiController
         $settings = $validated['settings'];
 
         // Validated as a whole before anything is written: a request naming
-        // one bad key alongside nine good ones must not save nine of them
-        // and then fail on the tenth, leaving the caller unsure what stuck.
-        $allowed = $this->settings->allowedKeys();
-
-        foreach (array_keys($settings) as $key) {
-            if (! in_array($key, $allowed, true)) {
-                return $this->json(['message' => UnknownSetting::named((string) $key, $allowed)->getMessage()], 422);
+        // one bad key (unknown, or a shape its validator rejects) alongside
+        // nine good ones must not save nine of them and then fail on the
+        // tenth, leaving the caller unsure what stuck.
+        foreach ($settings as $key => $value) {
+            try {
+                $this->settings->assertValid((string) $key, $value);
+            } catch (UnknownSetting|InvalidSettingValue $e) {
+                return $this->json(['message' => $e->getMessage()], 422);
             }
         }
 
