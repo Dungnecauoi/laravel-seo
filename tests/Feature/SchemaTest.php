@@ -180,6 +180,51 @@ final class SchemaTest extends TestCase
         $this->assertStringContainsString('Công Ty Của Tôi', $html);
     }
 
+    public function test_organization_passes_through_any_config_key_it_does_not_handle_itself(): void
+    {
+        config([
+            'seo.schema.organization.geo' => ['@type' => 'GeoCoordinates', 'latitude' => 21.03, 'longitude' => 105.85],
+            'seo.schema.organization.foundingDate' => '2020-01-01',
+        ]);
+
+        $organization = $this->node(Seo::schema($this->article())->toArray(), 'Organization');
+
+        $this->assertSame('GeoCoordinates', $organization['geo']['@type']);
+        $this->assertSame('2020-01-01', $organization['foundingDate']);
+    }
+
+    public function test_organization_still_wins_over_a_config_key_sharing_a_handled_name(): void
+    {
+        // 'name' is one of the fields this provider builds itself — a raw
+        // config passthrough must not let an unrelated key clobber it.
+        config(['seo.schema.organization.name' => 'Công Ty Của Tôi']);
+
+        $organization = $this->node(Seo::schema($this->article())->toArray(), 'Organization');
+
+        $this->assertSame('Công Ty Của Tôi', $organization['name']);
+    }
+
+    public function test_website_passes_through_any_config_key_it_does_not_handle_itself(): void
+    {
+        config(['seo.schema.website.description' => 'Trang tin tức hàng đầu']);
+
+        $website = $this->node(Seo::schema($this->article())->toArray(), 'WebSite');
+
+        $this->assertSame('Trang tin tức hàng đầu', $website['description']);
+    }
+
+    public function test_website_extra_keys_do_not_leak_the_search_url_field(): void
+    {
+        config(['seo.schema.website.search_url' => '/tim-kiem?q={search_term_string}']);
+
+        $website = $this->node(Seo::schema($this->article())->toArray(), 'WebSite');
+
+        // search_url only ever feeds potentialAction — it must not also
+        // show up verbatim as its own top-level property.
+        $this->assertArrayNotHasKey('search_url', $website);
+        $this->assertArrayHasKey('potentialAction', $website);
+    }
+
     /**
      * @param  array<string, mixed>  $graph
      * @return array<string, mixed>

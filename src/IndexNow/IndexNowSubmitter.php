@@ -7,7 +7,10 @@ namespace Duxbo\Seo\IndexNow;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Exceptions\IndexNowSubmissionFailed;
 use Illuminate\Contracts\Config\Repository as Config;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as Http;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Pushes changed URLs to every IndexNow-participating engine — Bing, Yandex,
@@ -61,18 +64,52 @@ final class IndexNowSubmitter
 
         $host = (string) parse_url($this->urls->home(), PHP_URL_HOST);
 
-        $response = $this->http->timeout(10)->post($this->endpoint(), [
-            'host' => $host,
-            'key' => $key,
-            'keyLocation' => $this->urls->absolute("/{$key}.txt"),
-            'urlList' => $urlList,
-        ]);
+        try {
+            $response = $this->http->timeout(10)->post($this->endpoint(), [
+                'host' => $host,
+                'key' => $key,
+                'keyLocation' => $this->urls->absolute("/{$key}.txt"),
+                'urlList' => $urlList,
+            ]);
+        } catch (ConnectionException $e) {
+            $this->log($urlList, successful: false, status: null, error: $e->getMessage());
+
+            throw IndexNowSubmissionFailed::http(0, $e->getMessage());
+        }
 
         if ($response->failed()) {
+            $this->log($urlList, successful: false, status: $response->status(), error: (string) $response->body());
+
             throw IndexNowSubmissionFailed::http($response->status(), (string) $response->body());
         }
 
+        $this->log($urlList, successful: true, status: $response->status(), error: null);
+
         return true;
+    }
+
+    /**
+     * @param  list<string>  $urls
+     */
+    private function log(array $urls, bool $successful, ?int $status, ?string $error): void
+    {
+        if ($this->config->get('seo.indexnow.log', true) !== true) {
+            return;
+        }
+
+        DB::table($this->logTable())->insert([
+            'urls' => json_encode($urls, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'url_count' => count($urls),
+            'successful' => $successful,
+            'status_code' => $status,
+            'error' => $error !== null ? mb_substr($error, 0, 1000) : null,
+            'created_at' => Carbon::now(),
+        ]);
+    }
+
+    private function logTable(): string
+    {
+        return (string) $this->config->get('seo.indexnow.log_table', 'seo_indexnow_log');
     }
 
     public function key(): ?string

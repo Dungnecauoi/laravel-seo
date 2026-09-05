@@ -388,6 +388,32 @@ return [
         'enabled' => env('SEO_INDEXNOW_ENABLED', false),
         'key' => env('SEO_INDEXNOW_KEY'),
         'endpoint' => 'https://api.indexnow.org/indexnow',
+
+        // One row per API call, not per URL — "did this submission go
+        // through" is the question this answers, not a full history of
+        // every individual URL ever pushed.
+        'log' => true,
+        'log_table' => 'seo_indexnow_log',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Audit history
+    |--------------------------------------------------------------------------
+    |
+    | `php artisan seo:audit` writes here — one seo_audit_batches row per run,
+    | one seo_audits row per record it scored. `seo_meta` only ever holds the
+    | latest state, never a trend line, so a dashboard charting "average score
+    | over the last 90 days" has nowhere else to read that from. Nothing
+    | schedules this on its own: an audit needs the model's actual body
+    | content to score readability and keyword usage, and only the
+    | application knows which attribute holds that.
+    |
+    */
+
+    'audit' => [
+        'batches_table' => 'seo_audit_batches',
+        'audits_table' => 'seo_audits',
     ],
 
     /*

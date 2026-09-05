@@ -130,6 +130,19 @@ a price belongs inside an `Offer`, an FAQ answer is its own node.
 `Seo::validateSchema($post)` lists what Google would silently drop the rich
 result over.
 
+The three site-wide nodes — `Organization`, `WebSite`, `WebPage` — pass
+through any `seo.schema.organization.*` / `seo.schema.website.*` config key
+they do not already build themselves, so `geo`, `foundingDate`,
+`areaServed`, or any other schema.org property just works without this
+package needing to know its name in advance:
+
+```php
+'schema' => ['organization' => [
+    'name' => 'Công Ty Của Tôi',
+    'geo' => ['@type' => 'GeoCoordinates', 'latitude' => 21.03, 'longitude' => 105.85],
+]],
+```
+
 Breadcrumbs are separate — implement `HasBreadcrumbs` when the model knows its
 own trail, since not every model does:
 
@@ -250,7 +263,31 @@ underlying `IndexNowSubmitter` automatically — listen for `SeoMetaSaved`
 (fired after every `Seo::save()`) and submit from there if a project wants
 that; auto-submitting on every save would mean a blocking outbound request on
 every panel edit, for every project, whether or not IndexNow is relevant to
-it.
+it. Every call is logged to `seo_indexnow_log` — one row per API call, not
+per URL — so "did this submission actually go through" has an answer besides
+the console output scrolling past. `seo.indexnow.log = false` turns that off.
+
+### Audit history
+
+A live analysis (the panel, `/analyze`, `Seo::analyzeModel()`) answers "how
+is this page doing right now." None of that is kept anywhere — `seo_meta`
+holds the latest stored values, not a trend line — so there is no way to
+answer "is the site's SEO getting better or worse" without something that
+keeps score over time:
+
+```bash
+php artisan seo:audit "App\Models\Post" --content=body
+```
+
+Scores every record the same way a live analysis would, and writes one
+`seo_audit_batches` row for the run (record count, average/min/max score)
+plus one `seo_audits` row per record (its score and which checks failed).
+Run it again next week and there are two batches to compare. Not scheduled
+by this package itself: scoring readability and keyword usage needs the
+record's actual body content, and only the application knows which attribute
+holds that — `--content` names it, the same way `seo.models.*.route` exists
+for URLs rather than this package guessing a column name. Schedule it
+yourself with Laravel's own scheduler if a project wants it to run nightly.
 
 ### Redirects and the 404 monitor
 

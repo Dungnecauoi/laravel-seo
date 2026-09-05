@@ -36,17 +36,30 @@ final class WebSiteProvider implements SchemaProvider
     }
 
     /**
+     * The only key here already spent on a specific field — everything else
+     * under seo.schema.website passes through as-is, matching
+     * {@see OrganizationProvider}'s own escape hatch, so a project can add
+     * 'description', 'copyrightYear', or any other schema.org property this
+     * class does not need to know the name of in advance.
+     */
+    private const HANDLED_KEYS = ['search_url'];
+
+    /**
      * @return array<string, mixed>
      */
     public function build(SeoContext $context): array
     {
         $home = $this->urls->home();
 
+        /** @var array<string, mixed> $configured */
+        $configured = $this->config->get('seo.schema.website', []);
+
         $node = [
             '@type' => 'WebSite',
             'url' => $home,
             'name' => $this->config->get('seo.site_name'),
             'publisher' => ['@id' => OrganizationProvider::idFor($this->urls)],
+            ...array_diff_key($configured, array_flip(self::HANDLED_KEYS)),
         ];
 
         if ($context->locale !== null) {

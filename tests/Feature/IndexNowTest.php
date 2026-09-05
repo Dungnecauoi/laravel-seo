@@ -7,10 +7,14 @@ namespace Duxbo\Seo\Tests\Feature;
 use Duxbo\Seo\Exceptions\IndexNowSubmissionFailed;
 use Duxbo\Seo\IndexNow\IndexNowSubmitter;
 use Duxbo\Seo\Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 final class IndexNowTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_submitting_while_disabled_is_a_silent_no_op(): void
     {
         // Installing a package must never start an outbound request on its
@@ -121,6 +125,62 @@ final class IndexNowTest extends TestCase
         $this->artisan('seo:indexnow', ['urls' => ['/x', '/y']])
             ->expectsOutputToContain('2 URL(s) submitted')
             ->assertSuccessful();
+    }
+
+    public function test_a_successful_submission_is_logged_as_one_row(): void
+    {
+        config([
+            'seo.indexnow.enabled' => true,
+            'seo.indexnow.key' => 'test-key-123',
+        ]);
+
+        Http::fake(['api.indexnow.org/*' => Http::response('', 200)]);
+
+        $this->submitter()->submit(['/a', '/a', '/b']);
+
+        $this->assertSame(1, DB::table('seo_indexnow_log')->count());
+
+        $row = DB::table('seo_indexnow_log')->first();
+        $this->assertSame(1, (int) $row->successful);
+        $this->assertSame(200, $row->status_code);
+        $this->assertSame(2, $row->url_count);
+        $this->assertSame(['http://localhost/a', 'http://localhost/b'], json_decode($row->urls, true));
+    }
+
+    public function test_a_failed_submission_is_logged_with_its_status_and_body(): void
+    {
+        config([
+            'seo.indexnow.enabled' => true,
+            'seo.indexnow.key' => 'test-key-123',
+        ]);
+
+        Http::fake(['api.indexnow.org/*' => Http::response('Forbidden', 403)]);
+
+        try {
+            $this->submitter()->submit('/x');
+        } catch (IndexNowSubmissionFailed) {
+            // Expected — the log assertion below is the point of this test.
+        }
+
+        $row = DB::table('seo_indexnow_log')->first();
+        $this->assertSame(0, (int) $row->successful);
+        $this->assertSame(403, $row->status_code);
+        $this->assertSame('Forbidden', $row->error);
+    }
+
+    public function test_logging_can_be_turned_off(): void
+    {
+        config([
+            'seo.indexnow.enabled' => true,
+            'seo.indexnow.key' => 'test-key-123',
+            'seo.indexnow.log' => false,
+        ]);
+
+        Http::fake(['api.indexnow.org/*' => Http::response('', 200)]);
+
+        $this->submitter()->submit('/x');
+
+        $this->assertSame(0, DB::table('seo_indexnow_log')->count());
     }
 
     private function submitter(): IndexNowSubmitter

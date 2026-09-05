@@ -37,6 +37,18 @@ final class OrganizationProvider implements SchemaProvider
     }
 
     /**
+     * Config keys already spent on a specific field above or on the logo
+     * node below — everything else in seo.schema.organization passes
+     * through as-is, which is what lets a project add `geo`,
+     * `foundingDate`, `areaServed`, `contactPoint`, or any other
+     * schema.org property without this class needing to know its name in
+     * advance. A fixed whitelist here would put this provider one field
+     * short of whatever the next project actually needs, the same mistake
+     * {@see \Duxbo\Seo\Schema\Types::product()} avoids with its own `$extra`.
+     */
+    private const HANDLED_KEYS = ['type', 'name', 'url', 'sameAs', 'logo', 'logo_width', 'logo_height'];
+
+    /**
      * @return array<string, mixed>|list<array<string, mixed>>
      */
     public function build(SeoContext $context): array
@@ -49,13 +61,8 @@ final class OrganizationProvider implements SchemaProvider
             'name' => $organization['name'] ?? null,
             'url' => $organization['url'] ?? $this->urls->home(),
             'sameAs' => $organization['sameAs'] ?? [],
+            ...array_diff_key($organization, array_flip(self::HANDLED_KEYS)),
         ];
-
-        foreach (['telephone', 'email', 'address', 'priceRange', 'openingHours'] as $optional) {
-            if (isset($organization[$optional])) {
-                $node[$optional] = $organization[$optional];
-            }
-        }
 
         if (! isset($organization['logo']) || ! is_string($organization['logo'])) {
             return $node;

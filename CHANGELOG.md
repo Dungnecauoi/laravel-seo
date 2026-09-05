@@ -73,6 +73,41 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — schema escape hatches, IndexNow submission log, audit history
+
+Compared this package's tables against a competing SEO module's schema
+(seo_404_logs, seo_audits, seo_instant_indexing, seo_internal_links,
+seo_keyword_rankings, seo_search_console_stats, …) to see what a genuinely
+different kind of table represented, versus what was already covered under a
+different name:
+
+- **Schema escape hatches** — `OrganizationProvider` and `WebSiteProvider`
+  used to build their node from a fixed field whitelist; anything else in
+  `seo.schema.organization.*` / `seo.schema.website.*` is now merged straight
+  through. The same inconsistency `Types::product()`'s own `$extra` parameter
+  already avoided elsewhere in this same file — a fixed whitelist is always
+  one field short of whatever the next project asks for, and there was no way
+  to add `geo`, `foundingDate`, or `areaServed` without forking the class.
+- **IndexNow submission log** — `seo_indexnow_log`, one row per API call
+  (not per URL), recording whether it succeeded and the response status —
+  answers "did this actually go through" without scrolling back through
+  console output. `seo.indexnow.log = false` turns it off.
+- **Audit history** — `php artisan seo:audit {model} --content={attribute}`
+  scores every record the same way a live analysis does and keeps the
+  result: one `seo_audit_batches` row per run (count, average/min/max score),
+  one `seo_audits` row per record (its score, which checks failed). A live
+  analysis and `seo_meta` both only ever answer "right now" — this is what
+  answers "is the site's SEO trending up or down," which needed a table that
+  did not otherwise exist. Not scheduled automatically: scoring content needs
+  the record's actual body, and only the application knows which attribute
+  holds it, the same reasoning behind `seo.models.*.route` for URLs.
+
+Keyword rank tracking, from the same comparison, is deliberately not here:
+Google offers no free rank-position API, so it needs a paid third-party SERP
+service the application must choose and pay for itself — the same
+bring-your-own-key shape the AI drivers already use, not something this
+package can turn on by default the way the two additions above are.
+
 ### Added — search console verification, AI crawler control, IndexNow, hreflang collision audit
 
 Four gaps from a third audit, this time asking not "is the core stable" but
