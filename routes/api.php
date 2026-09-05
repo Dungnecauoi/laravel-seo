@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Duxbo\Seo\Http\Api\V1\AnalyzeController;
 use Duxbo\Seo\Http\Api\V1\ContentController;
 use Duxbo\Seo\Http\Api\V1\DashboardController;
+use Duxbo\Seo\Http\Api\V1\DynamicSettingsController;
 use Duxbo\Seo\Http\Api\V1\MetaController;
 use Duxbo\Seo\Http\Api\V1\NotFoundController;
 use Duxbo\Seo\Http\Api\V1\RedirectsController;
@@ -52,6 +53,15 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
         Route::get('dashboard', DashboardController::class);
         Route::get('content', ContentController::class);
         Route::get('settings', SettingsController::class);
+
+        // Distinct from the read-only status view above: this is the CRUD
+        // surface a project's own settings page reads and writes, over
+        // exactly the keys seo.settings.keys allowlists.
+        Route::prefix('dynamic-settings')->group(static function (): void {
+            Route::get('/', [DynamicSettingsController::class, 'index']);
+            Route::put('/', [DynamicSettingsController::class, 'update']);
+            Route::delete('{key}', [DynamicSettingsController::class, 'destroy'])->where('key', '[A-Za-z0-9_.]+');
+        });
 
         Route::prefix('redirects')->group(static function (): void {
             Route::get('/', [RedirectsController::class, 'index']);

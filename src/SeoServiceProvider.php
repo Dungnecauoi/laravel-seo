@@ -66,6 +66,9 @@ final class SeoServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom($this->configPath(), 'seo');
 
+        $this->app->singleton(Settings\SettingsRepository::class);
+        $this->applyDynamicSettings();
+
         $this->app->singleton(Storage\SeoDataMapper::class);
         $this->app->singleton(SchemaNormalizer::class);
         $this->app->singleton(SchemaValidator::class);
@@ -92,6 +95,27 @@ final class SeoServiceProvider extends ServiceProvider
         $this->registerSitemap();
         $this->registerAnalyzer();
         $this->registerManager();
+    }
+
+    /**
+     * Pushes every stored setting override into the config repository before
+     * anything else in this package reads a single seo.* key — including
+     * this same class's own boot(), which decides whether to load the API
+     * and panel routes from exactly the keys this can override.
+     *
+     * A fresh install has not migrated seo_settings yet, and most projects
+     * will never turn this on at all — {@see Settings\SettingsRepository::all()}
+     * already swallows a missing table, but `enabled` is checked again here
+     * too so a disabled project pays for none of this, not even the query
+     * caching layer wraps around it.
+     */
+    private function applyDynamicSettings(): void
+    {
+        if ($this->app['config']->get('seo.settings.enabled', false) !== true) {
+            return;
+        }
+
+        $this->app->make(Settings\SettingsRepository::class)->applyToConfig();
     }
 
     public function boot(): void

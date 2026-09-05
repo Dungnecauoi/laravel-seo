@@ -426,6 +426,41 @@ disabled by default and its Gate denies everyone until the application defines
 it — an SEO panel can rewrite every title on a site, so forgetting to configure
 it must lock the door rather than open it.
 
+### Dynamic settings
+
+Everything above is `config/seo.php` — a file, changed by editing it and
+deploying. `seo.settings.enabled = true` makes a specific, allowlisted subset
+of it changeable at runtime instead, over the same `/api/seo/v1` Gate as
+everything else, for a project that wants a settings *page* rather than a
+settings *file*:
+
+```php
+'settings' => ['enabled' => true],
+```
+
+```ts
+await fetch(`${API}/api/seo/v1/dynamic-settings`)  // GET — every allowlisted key, its value, and whether it's overridden
+await fetch(`${API}/api/seo/v1/dynamic-settings`, {
+  method: 'PUT',
+  body: JSON.stringify({ settings: { 'verification.google': 'abc123' } }),
+})
+await fetch(`${API}/api/seo/v1/dynamic-settings/verification.google`, { method: 'DELETE' })  // revert to the config file's own value
+```
+
+This package ships no UI for it — the point of the API is that whichever
+front end reads `GET` to render a form and calls `PUT` to save it, without
+either needing to know the other exists.
+
+Nothing that already reads `config('seo.*')` — `HtmlFormatter`,
+`RobotsTxt`, `GlobalDefaultStage`, all of it — changed to support this.
+`SettingsRepository::applyToConfig()` runs once at boot, before any of them,
+and pushes every stored override straight into Laravel's own config
+repository; every existing consumer picks it up simply because it was
+already reading `config()`. Only the dot-notated keys listed in
+`seo.settings.keys` can ever be written this way — the same reasoning
+behind `seo.api.models` allowlisting which model types the API can touch,
+rather than accepting any key a caller names.
+
 ### AI assistance
 
 Off by default, because installing a package must never start billing anyone.

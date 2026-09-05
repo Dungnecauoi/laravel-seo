@@ -73,6 +73,31 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — dynamic settings, backed by an API
+
+`config/seo.php` was, until now, the only way to change anything — a file,
+requiring a deploy. `seo.settings.enabled = true` opts a project into
+`seo_settings`, a table `SettingsRepository::applyToConfig()` reads once at
+boot and pushes straight into Laravel's own config repository, before
+anything else in the package reads a single `seo.*` key. Every existing
+consumer — `HtmlFormatter`, `RobotsTxt`, `GlobalDefaultStage`, the
+verification and IndexNow code added earlier in this same file — needed
+zero changes to support this: they already read `config()`, and this only
+changes what that call returns.
+
+Only the dot-notated keys listed in the new `seo.settings.keys` can ever be
+written through `SettingsRepository::set()` — arbitrary keys are rejected
+with `UnknownSetting`, the same allowlist-not-guess reasoning `seo.api.models`
+already uses for which model types the API can touch. Exposed over
+`/api/seo/v1/dynamic-settings` (`GET`/`PUT`/`DELETE`) behind the same Gate as
+the rest of the REST API — this package ships no settings-page UI itself,
+since the API existing at all is what lets a project's own front end build
+one without either side needing to know the other exists. Off by default,
+and a missing `seo_settings` table (a fresh install that never migrated it)
+is treated as "no overrides" rather than a fatal error, the same defensive
+handling already used elsewhere in this file for a table that might not
+exist yet.
+
 ### Added — internal link graph, Search Console sync
 
 The other two real gaps from the same table-by-table comparison, both

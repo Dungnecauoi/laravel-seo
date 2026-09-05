@@ -465,6 +465,62 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Dynamic settings
+    |--------------------------------------------------------------------------
+    |
+    | Everything in this file is read at every boot regardless — a stored
+    | override just wins over the value written here, applied before
+    | anything else in the package reads a single seo.* key. Off by default:
+    | this file is the only source of truth until a project opts in, so
+    | installing the package never depends on a migration having run yet.
+    |
+    | Only the dot-notated keys listed here can ever be written through
+    | `SettingsRepository::set()` or the REST API — the same reasoning
+    | behind `seo.api.models` allowlisting which model types the API can
+    | touch, rather than accepting any key a caller names. Keys that gate
+    | route registration at boot (`api.enabled`, `panel.enabled`,
+    | `indexnow.enabled` alongside its key) still only take effect on the
+    | next full boot in a long-running process (Octane, a queue worker) —
+    | in the ordinary PHP-FPM request lifecycle this file re-reads on every
+    | request anyway, so there is nothing to wait for there.
+    |
+    */
+
+    'settings' => [
+        'enabled' => env('SEO_DYNAMIC_SETTINGS_ENABLED', false),
+        'table' => 'seo_settings',
+        'cache_ttl' => 60,
+
+        'keys' => [
+            'enabled',
+            'site_name',
+            'defaults.title',
+            'defaults.description',
+            'defaults.robots',
+            'defaults.og.site_name',
+            'defaults.twitter.card',
+            'verification.google',
+            'verification.bing',
+            'verification.yandex',
+            'verification.pinterest',
+            'verification.facebook',
+            'robots.block_ai_crawlers',
+            'schema.organization.name',
+            'schema.organization.logo',
+            'schema.organization.sameAs',
+            'schema.website.search_url',
+            'indexnow.enabled',
+            'indexnow.key',
+            'search_console.enabled',
+            'search_console.client_id',
+            'search_console.client_secret',
+            'search_console.refresh_token',
+            'search_console.site_url',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Redirects
     |--------------------------------------------------------------------------
     |
