@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { act, create } from 'react-test-renderer'
-import type { ContentListResponse, SeoClient } from '@duxbo/seo-core'
-import { SeoContentList } from './SeoContentList.js'
+import type { SearchConsoleStatsResponse, SeoClient } from '@duxbo/seo-core'
+import { SeoSearchConsoleStats } from './SeoSearchConsoleStats.js'
 
-function stubClient(content: (type?: string, page?: number) => Promise<ContentListResponse>): SeoClient {
+function stubClient(searchConsoleStats: (days?: number) => Promise<SearchConsoleStatsResponse>): SeoClient {
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async () => ({ score: 0, locale: null, results: [] }),
@@ -25,7 +25,7 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
       sitemapSources: 0,
       exposedTypes: [],
     }),
-    content,
+    content: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
     settings: async () => ({
       seoEnabled: true,
       indexableEnvironments: [],
@@ -49,64 +49,47 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
     deleteDynamicSetting: async (key) => ({ cleared: key }),
     auditHistory: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
     internalLinks: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
-    searchConsoleStats: async () => ({ days: 30, totalClicks: 0, totalImpressions: 0, data: [] }),
+    searchConsoleStats,
     indexNowLog: async () => ({ data: [] }),
   }
 }
 
-test('shows an untitled record with the fallback pill rather than a blank cell', async () => {
+test('renders rows summed per URL', async () => {
   const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 1, title: null, description: null, robots: null, url: '/trong' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
+    days: 30,
+    totalClicks: 17,
+    totalImpressions: 150,
+    data: [{ url: 'https://trangcuatoi.vn/a', clicks: 17, impressions: 150, ctr: 0.1133, position: 4.2 }],
   }))
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
+    renderer = create(<SeoSearchConsoleStats client={client} />)
   })
 
-  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Chưa có tiêu đề'))
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('trangcuatoi.vn/a'))
+  assert.ok(json.includes('17'))
+  assert.ok(json.includes('11.3%'))
 })
 
-test('onEdit receives the row type and id', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 42, title: 'Bài viết', description: null, robots: null, url: '/bai-viet' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
-
-  const edits: [string, string | number][] = []
-  let renderer: ReturnType<typeof create>
-
-  await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" onEdit={(t, id) => edits.push([t, id])} />)
+test('switching the window re-fetches with the new day count', async () => {
+  let lastDays: number | undefined
+  const client = stubClient(async (days) => {
+    lastDays = days
+    return { days: days ?? 30, totalClicks: 0, totalImpressions: 0, data: [] }
   })
 
-  const button = renderer!.root.findByProps({ children: 'Sửa' })
+  let renderer: ReturnType<typeof create>
+  await act(async () => {
+    renderer = create(<SeoSearchConsoleStats client={client} />)
+  })
 
-  act(() => {
+  const button = renderer!.root.findByProps({ children: '7 ngày' })
+
+  await act(async () => {
     button.props.onClick()
   })
 
-  assert.deepEqual(edits, [['post', 42]])
-})
-
-test('paging past the last page is disabled', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 1, title: 'x', description: null, robots: null, url: '/x' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
-
-  let renderer: ReturnType<typeof create>
-  await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
-  })
-
-  // A single page renders no pager at all.
-  assert.equal(renderer!.root.findAllByProps({ children: 'Sau →' }).length, 0)
+  assert.equal(lastDays, 7)
 })

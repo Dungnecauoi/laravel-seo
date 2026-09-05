@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { act, create } from 'react-test-renderer'
-import type { ContentListResponse, SeoClient } from '@duxbo/seo-core'
-import { SeoContentList } from './SeoContentList.js'
+import type { InternalLinksResponse, SeoClient } from '@duxbo/seo-core'
+import { SeoInternalLinks } from './SeoInternalLinks.js'
 
-function stubClient(content: (type?: string, page?: number) => Promise<ContentListResponse>): SeoClient {
+function stubClient(internalLinks: (type?: string) => Promise<InternalLinksResponse>): SeoClient {
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async () => ({ score: 0, locale: null, results: [] }),
@@ -25,7 +25,7 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
       sitemapSources: 0,
       exposedTypes: [],
     }),
-    content,
+    content: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
     settings: async () => ({
       seoEnabled: true,
       indexableEnvironments: [],
@@ -48,65 +48,40 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
     updateDynamicSettings: async (settings) => ({ saved: Object.keys(settings) }),
     deleteDynamicSetting: async (key) => ({ cleared: key }),
     auditHistory: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
-    internalLinks: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
+    internalLinks,
     searchConsoleStats: async () => ({ days: 30, totalClicks: 0, totalImpressions: 0, data: [] }),
     indexNowLog: async () => ({ data: [] }),
   }
 }
 
-test('shows an untitled record with the fallback pill rather than a blank cell', async () => {
+test('flags a row with zero incoming links as an orphan', async () => {
   const client = stubClient(async () => ({
     exposedTypes: ['post'],
     type: 'post',
-    data: [{ id: 1, title: null, description: null, robots: null, url: '/trong' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
+    data: [
+      { id: 1, url: '/bai-a', incomingLinks: 2, outgoingLinks: 1, isOrphan: false },
+      { id: 2, url: '/bai-b', incomingLinks: 0, outgoingLinks: 3, isOrphan: true },
+    ],
+    meta: { currentPage: 1, lastPage: 1, total: 2 },
   }))
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
+    renderer = create(<SeoInternalLinks client={client} type="post" />)
   })
 
-  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Chưa có tiêu đề'))
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('Mồ côi'))
+  assert.ok(json.includes('/bai-a'))
 })
 
-test('onEdit receives the row type and id', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 42, title: 'Bài viết', description: null, robots: null, url: '/bai-viet' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
-
-  const edits: [string, string | number][] = []
-  let renderer: ReturnType<typeof create>
-
-  await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" onEdit={(t, id) => edits.push([t, id])} />)
-  })
-
-  const button = renderer!.root.findByProps({ children: 'Sửa' })
-
-  act(() => {
-    button.props.onClick()
-  })
-
-  assert.deepEqual(edits, [['post', 42]])
-})
-
-test('paging past the last page is disabled', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 1, title: 'x', description: null, robots: null, url: '/x' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
+test('shows the empty state with no rows', async () => {
+  const client = stubClient(async () => ({ exposedTypes: ['post'], type: 'post', data: [], meta: null }))
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
+    renderer = create(<SeoInternalLinks client={client} type="post" />)
   })
 
-  // A single page renders no pager at all.
-  assert.equal(renderer!.root.findAllByProps({ children: 'Sau →' }).length, 0)
+  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Không có bản ghi nào'))
 })

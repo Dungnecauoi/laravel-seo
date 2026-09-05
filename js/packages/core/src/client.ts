@@ -1,15 +1,19 @@
 import { SeoApiError, SeoTimeoutError } from './errors.js'
 import type {
   AnalysisReport,
+  AuditHistoryResponse,
   ContentListResponse,
   DashboardStats,
   DynamicSettingsResponse,
+  IndexNowLogResponse,
+  InternalLinksResponse,
   MetaResponse,
   NotFoundEntry,
   OutputFormat,
   RedirectInput,
   RedirectListResponse,
   ResolvedMeta,
+  SearchConsoleStatsResponse,
   SeoClientOptions,
   SeoData,
   SettingsResponse,
@@ -42,6 +46,15 @@ export interface SeoClient {
   /** @param settings Dot-notated key => value, e.g. `{ 'verification.google': 'abc123' }`. */
   updateDynamicSettings(settings: Record<string, unknown>): Promise<{ saved: string[] }>
   deleteDynamicSetting(key: string): Promise<{ cleared: string }>
+
+  /** Read side of `php artisan seo:audit`. */
+  auditHistory(model?: string, page?: number): Promise<AuditHistoryResponse>
+  /** Read side of `php artisan seo:internal-links`. */
+  internalLinks(type?: string, page?: number): Promise<InternalLinksResponse>
+  /** Read side of `php artisan seo:search-console:sync`. */
+  searchConsoleStats(days?: number): Promise<SearchConsoleStatsResponse>
+  /** Recent IndexNow submissions, newest first. */
+  indexNowLog(limit?: number): Promise<IndexNowLogResponse>
 }
 
 export interface AnalyzeInput {
@@ -223,6 +236,22 @@ export function createSeoClient(options: SeoClientOptions): SeoClient {
 
     deleteDynamicSetting(key) {
       return request(`dynamic-settings/${encodeURIComponent(key)}`, { method: 'DELETE' })
+    },
+
+    auditHistory(model, page) {
+      return request(`audit-history${query({ model, page })}`)
+    },
+
+    internalLinks(type, page) {
+      return request(`internal-links${query({ type, page })}`)
+    },
+
+    searchConsoleStats(days) {
+      return request(`search-console/stats${query({ days })}`)
+    },
+
+    indexNowLog(limit) {
+      return request(`indexnow/log${query({ limit })}`)
     },
   }
 }

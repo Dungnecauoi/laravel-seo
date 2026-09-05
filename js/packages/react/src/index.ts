@@ -18,13 +18,33 @@ export type { SeoNotFoundMonitorProps } from './SeoNotFoundMonitor.js'
 export { SeoSettings } from './SeoSettings.js'
 export type { SeoSettingsProps } from './SeoSettings.js'
 
+export { SeoAuditHistory } from './SeoAuditHistory.js'
+export type { SeoAuditHistoryProps } from './SeoAuditHistory.js'
+
+export { SeoInternalLinks } from './SeoInternalLinks.js'
+export type { SeoInternalLinksProps } from './SeoInternalLinks.js'
+
+export { SeoSearchConsoleStats } from './SeoSearchConsoleStats.js'
+export type { SeoSearchConsoleStatsProps } from './SeoSearchConsoleStats.js'
+
+export { SeoIndexNowLog } from './SeoIndexNowLog.js'
+export type { SeoIndexNowLogProps } from './SeoIndexNowLog.js'
+
 export type {
   AnalysisReport,
+  AuditBatchEntry,
+  AuditHistoryResponse,
   CheckResult,
   CheckStatus,
   ContentListResponse,
   ContentRow,
   DashboardStats,
+  DynamicSettingValue,
+  DynamicSettingsResponse,
+  IndexNowLogEntry,
+  IndexNowLogResponse,
+  InternalLinkRow,
+  InternalLinksResponse,
   MetaResponse,
   MetaStore,
   MetaStoreOptions,
@@ -39,6 +59,8 @@ export type {
   RedirectMatchType,
   RedirectStatus,
   ResolvedMeta,
+  SearchConsoleStatRow,
+  SearchConsoleStatsResponse,
   SeoClient,
   SeoClientOptions,
   SeoData,

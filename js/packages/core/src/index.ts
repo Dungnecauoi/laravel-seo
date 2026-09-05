@@ -8,6 +8,8 @@ export { SeoApiError, SeoTimeoutError } from './errors.js'
 
 export type {
   AnalysisReport,
+  AuditBatchEntry,
+  AuditHistoryResponse,
   CheckResult,
   CheckStatus,
   ContentListResponse,
@@ -15,6 +17,10 @@ export type {
   DashboardStats,
   DynamicSettingValue,
   DynamicSettingsResponse,
+  IndexNowLogEntry,
+  IndexNowLogResponse,
+  InternalLinkRow,
+  InternalLinksResponse,
   MetaResponse,
   NotFoundEntry,
   OpenGraphData,
@@ -26,6 +32,8 @@ export type {
   RedirectMatchType,
   RedirectStatus,
   ResolvedMeta,
+  SearchConsoleStatRow,
+  SearchConsoleStatsResponse,
   SeoClientOptions,
   SeoData,
   SettingsResponse,

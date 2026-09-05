@@ -38,6 +38,10 @@ function stubClient(dashboard: () => Promise<DashboardStats>): SeoClient {
     dynamicSettings: async () => ({ enabled: false, settings: {} }),
     updateDynamicSettings: async (settings) => ({ saved: Object.keys(settings) }),
     deleteDynamicSetting: async (key) => ({ cleared: key }),
+    auditHistory: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
+    internalLinks: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
+    searchConsoleStats: async () => ({ days: 30, totalClicks: 0, totalImpressions: 0, data: [] }),
+    indexNowLog: async () => ({ data: [] }),
   }
 }
 

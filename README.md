@@ -535,7 +535,7 @@ with no admin UI at all.
 **[`@duxbo/seo-react`](js/packages/react/)** and **[`@duxbo/seo-vue`](js/packages/vue/)**
 — hooks/composables plus a Tailwind-styled admin shell, built on
 `@duxbo/seo-core`, for a project with a front-end build step. `SeoPanel`
-edits one record; five more components cover the rest, each fetching through
+edits one record; nine more components cover the rest, each fetching through
 the same `SeoClient` and none of them routing on its own:
 
 ```tsx
@@ -545,12 +545,20 @@ the same `SeoClient` and none of them routing on its own:
 <SeoRedirects client={client} />
 <SeoNotFoundMonitor client={client} />
 <SeoSettings client={client} />
+<SeoAuditHistory client={client} model="App\Models\Post" />
+<SeoInternalLinks client={client} type="post" />
+<SeoSearchConsoleStats client={client} />
+<SeoIndexNowLog client={client} />
 ```
 
-All six need `seo.api.enabled = true` — they talk to `/api/seo/v1`, not the
+All ten need `seo.api.enabled = true` — they talk to `/api/seo/v1`, not the
 Blade panel's session routes — and this package's build output added to
 Tailwind's `content` globs, or the classes are purged and everything renders
-unstyled.
+unstyled. The last four are read-only views over what a console command
+already wrote (`seo:audit`, `seo:internal-links`,
+`seo:search-console:sync`, and every IndexNow submission's own log) — none
+of them run that work themselves, the same reason the Blade equivalents
+don't either.
 
 `SeoSettings` also needs `seo.settings.enabled = true` for its edit form to
 appear at all — without it, the read-only status above still renders, and a
@@ -574,6 +582,10 @@ nothing.
 | `/seo/panel/redirects` | Create, toggle, and delete redirects |
 | `/seo/panel/not-found` | 404 log — prune old entries, or turn a hit straight into a redirect |
 | `/seo/panel/settings` | Read-only status, plus an edit form when `seo.settings.enabled = true` |
+| `/seo/panel/audit-history` | `seo:audit` batches, newest first |
+| `/seo/panel/internal-links?type=post` | Incoming/outgoing link counts from `seo:internal-links`, orphans flagged |
+| `/seo/panel/search-console` | `seo:search-console:sync` results, summed per page |
+| `/seo/panel/indexnow-log` | Recent IndexNow submissions |
 
 Every page is plain `fetch()` and scoped `seo-`-prefixed CSS — no build step, no
 Tailwind requirement, no JS framework. It talks to its own routes under `web`

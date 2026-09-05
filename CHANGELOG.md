@@ -73,6 +73,35 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — read APIs and full UI for audit history, internal links, Search Console, IndexNow log
+
+Four console commands (`seo:audit`, `seo:internal-links`,
+`seo:search-console:sync`, and IndexNow's own logging) wrote data nothing
+could read back except by querying the database directly. Added the read
+side of each, then a view over it in all three UIs:
+
+- `GET /api/seo/v1/audit-history` — batches newest first, filterable by model
+- `GET /api/seo/v1/internal-links?type=X` — incoming/outgoing link counts
+  per record, flagging zero incoming as an orphan
+- `GET /api/seo/v1/search-console/stats?days=N` — clicks/impressions/position
+  summed per URL over the window, not one row per day
+- `GET /api/seo/v1/indexnow/log` — recent submissions, newest first
+
+Blade gets four new pages (`/seo/panel/audit-history`, `/internal-links`,
+`/search-console`, `/indexnow-log`) wired into the nav; React and Vue each
+get four matching components (`SeoAuditHistory`, `SeoInternalLinks`,
+`SeoSearchConsoleStats`, `SeoIndexNowLog`). All of them read-only — none of
+the four runs the underlying command itself, the same reasoning that keeps
+a real site crawl or an OAuth-backed API sync off a request a page load
+waits on.
+
+Caught during this batch: two React components rendered `{expression} literal text`
+as JSX, which produces two separate text nodes rather than one concatenated
+string — invisible in a browser, which merges adjacent text nodes on its
+own, but exactly the kind of thing a substring-matching test assertion
+exposes. Fixed to a single template-literal expression in both places, and
+the tests that caught it stay as the regression coverage.
+
 ### Added — an edit form for dynamic settings, in all three UIs
 
 Dynamic settings shipped with a REST API and no UI at all — a project had to

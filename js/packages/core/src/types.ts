@@ -186,6 +186,71 @@ export interface DynamicSettingsResponse {
   settings: Record<string, DynamicSettingValue>
 }
 
+/** One `php artisan seo:audit` run. */
+export interface AuditBatchEntry {
+  id: number
+  model: string
+  locale: string | null
+  totalRecords: number
+  averageScore: number | null
+  minScore: number | null
+  maxScore: number | null
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export interface AuditHistoryResponse {
+  data: AuditBatchEntry[]
+  meta: PageMeta
+}
+
+/** One record's internal-link count, from `php artisan seo:internal-links`. */
+export interface InternalLinkRow {
+  id: string | number
+  url: string
+  incomingLinks: number
+  outgoingLinks: number
+  isOrphan: boolean
+}
+
+export interface InternalLinksResponse {
+  exposedTypes: string[]
+  type: string | null
+  data: InternalLinkRow[]
+  meta: PageMeta | null
+}
+
+/** One page's Search Console performance, summed over the requested window. */
+export interface SearchConsoleStatRow {
+  url: string
+  clicks: number
+  impressions: number
+  ctr: number
+  position: number | null
+}
+
+export interface SearchConsoleStatsResponse {
+  days: number
+  totalClicks: number
+  totalImpressions: number
+  data: SearchConsoleStatRow[]
+}
+
+/** One IndexNow API call — a batch of URLs, not one entry per URL. */
+export interface IndexNowLogEntry {
+  id: number
+  urls: string[]
+  urlCount: number
+  successful: boolean
+  statusCode: number | null
+  error: string | null
+  createdAt: string | null
+}
+
+export interface IndexNowLogResponse {
+  data: IndexNowLogEntry[]
+}
+
 export interface SeoClientOptions {
   /** Origin of the Laravel application, without a trailing slash. */
   baseUrl: string

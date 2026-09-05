@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { act, create } from 'react-test-renderer'
-import type { SeoClient } from '@duxbo/seo-core'
-import { useMetaStore } from './useMetaStore.js'
-import type { MetaStore } from '@duxbo/seo-core'
+import type { IndexNowLogResponse, SeoClient } from '@duxbo/seo-core'
+import { SeoIndexNowLog } from './SeoIndexNowLog.js'
 
-function stubClient(overrides: Partial<SeoClient> = {}): SeoClient {
+function stubClient(indexNowLog: () => Promise<IndexNowLogResponse>): SeoClient {
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async () => ({ score: 0, locale: null, results: [] }),
@@ -51,85 +50,65 @@ function stubClient(overrides: Partial<SeoClient> = {}): SeoClient {
     auditHistory: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
     internalLinks: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
     searchConsoleStats: async () => ({ days: 30, totalClicks: 0, totalImpressions: 0, data: [] }),
-    indexNowLog: async () => ({ data: [] }),
-    ...overrides,
+    indexNowLog,
   }
 }
 
-function Probe({ client, id, onStore }: { client: SeoClient; id: number; onStore: (s: MetaStore) => void }) {
-  const store = useMetaStore(client, { type: 'post', id })
-  onStore(store)
-  return null
-}
-
-test('the returned store reflects an edit after onChange fires', async () => {
-  let latest: MetaStore | null = null
-  const client = stubClient()
+test('shows the empty state with no submissions', async () => {
+  const client = stubClient(async () => ({ data: [] }))
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<Probe client={client} id={1} onStore={(s) => (latest = s)} />)
+    renderer = create(<SeoIndexNowLog client={client} />)
   })
 
-  await act(async () => {
-    latest!.set('title', 'Tiêu đề mới')
-  })
-
-  assert.equal(latest!.draft.title, 'Tiêu đề mới')
-  assert.equal(latest!.isDirty, true)
-
-  renderer!.unmount()
+  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Chưa có lần gửi nào'))
 })
 
-test('changing the target identity produces a fresh, undirtied store', async () => {
-  const seen: MetaStore[] = []
-  const client = stubClient()
+test('renders a failed submission with its status and error as a tooltip', async () => {
+  const client = stubClient(async () => ({
+    data: [
+      {
+        id: 1,
+        urls: ['/a', '/b'],
+        urlCount: 2,
+        successful: false,
+        statusCode: 403,
+        error: 'Forbidden',
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+    ],
+  }))
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<Probe client={client} id={1} onStore={(s) => seen.push(s)} />)
+    renderer = create(<SeoIndexNowLog client={client} />)
   })
 
-  await act(async () => {
-    seen[seen.length - 1]!.set('title', 'Bẩn')
-  })
-
-  act(() => {
-    renderer!.update(<Probe client={client} id={2} onStore={(s) => seen.push(s)} />)
-  })
-
-  const afterSwitch = seen[seen.length - 1]!
-
-  // A store scoped to post 1 must not leak its dirty title into post 2.
-  assert.equal(afterSwitch.isDirty, false)
-  assert.notEqual(afterSwitch.draft.title, 'Bẩn')
-
-  renderer!.unmount()
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('Lỗi (403)'))
+  assert.ok(json.includes('Forbidden'))
 })
 
-test('unmounting cancels a pending debounced analysis', async () => {
-  let calls = 0
-  const client = stubClient({
-    analyze: async () => {
-      calls++
-      return { score: 1, locale: null, results: [] }
-    },
-  })
+test('truncates a long URL list rather than listing every one', async () => {
+  const client = stubClient(async () => ({
+    data: [
+      {
+        id: 1,
+        urls: ['/a', '/b', '/c', '/d'],
+        urlCount: 4,
+        successful: true,
+        statusCode: 200,
+        error: null,
+        createdAt: null,
+      },
+    ],
+  }))
 
-  let latest: MetaStore | null = null
   let renderer: ReturnType<typeof create>
-
   await act(async () => {
-    renderer = create(<Probe client={client} id={1} onStore={(s) => (latest = s)} />)
+    renderer = create(<SeoIndexNowLog client={client} />)
   })
 
-  act(() => {
-    latest!.analyze('nội dung')
-  })
-
-  renderer!.unmount()
-
-  await new Promise((resolve) => setTimeout(resolve, 700))
-
-  assert.equal(calls, 0)
+  assert.ok(JSON.stringify(renderer!.toJSON()).includes('+2 nữa'))
 })
