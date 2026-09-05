@@ -10,6 +10,7 @@ use Duxbo\Seo\Ai\Drivers\GeminiDriver;
 use Duxbo\Seo\Ai\Drivers\NullDriver;
 use Duxbo\Seo\Ai\Drivers\OpenAiDriver;
 use Duxbo\Seo\Contracts\AiDriver;
+use Duxbo\Seo\Contracts\ResetsBetweenRequests;
 use Duxbo\Seo\Data\AiRequest;
 use Duxbo\Seo\Data\AiResponse;
 use Duxbo\Seo\Events\AiRequestSent;
@@ -26,9 +27,19 @@ use InvalidArgumentException;
  * The default driver is `null`: installing a package must never start billing
  * anyone, so AI stays inert until a real driver is configured.
  */
-final class AiManager
+final class AiManager implements ResetsBetweenRequests
 {
-    /** @var array<string, AiDriver> */
+    /**
+     * Built drivers, keyed by name — not `$custom` below, which is a
+     * registered *factory* an application is expected to set up once, in a
+     * service provider, the same as `Blade::directive()`. `$resolved`
+     * memoizes what that factory (or a built-in driver's config) actually
+     * produced, which is exactly the kind of thing a long-running worker
+     * needs to rebuild once a new request starts, in case the config it
+     * closed over has changed since.
+     *
+     * @var array<string, AiDriver>
+     */
     private array $resolved = [];
 
     /** @var array<string, Closure(Container, array<string, mixed>): AiDriver> */
@@ -62,6 +73,19 @@ final class AiManager
         unset($this->resolved[$name]);
 
         return $this;
+    }
+
+    /**
+     * Registered factories in `$custom` are left alone — an application
+     * sets those up once, expecting them to stay for the process's life,
+     * the same as a route or a Blade directive. Only `$resolved` is
+     * dropped, so the next `driver()` call rebuilds from whatever the
+     * current config says rather than whatever it said when this worker
+     * first booted.
+     */
+    public function resetForNewRequest(): void
+    {
+        $this->resolved = [];
     }
 
     public function prompts(): PromptLibrary

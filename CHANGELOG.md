@@ -73,6 +73,39 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Fixed — three singletons that went stale under Octane and long-running queue workers
+
+Auditing every singleton this package registers found three that cache
+something in an instance property rather than only in Laravel's own `Cache`
+store — invisible under ordinary PHP-FPM, where the whole container is
+rebuilt fresh every request, but a real bug under Laravel Octane or a
+long-running `queue:work` process, where the same instance persists across
+many requests or jobs:
+
+- `CachedRedirectMatcher` — the worst of the three. Its `$rules` property is
+  its own shortcut on top of the shared cache `flush()` already invalidates
+  correctly; under a persistent worker, an edit made through *another*
+  worker's process calls `flush()` on a *different* instance, leaving this
+  one still serving the redirect list from before the edit — indefinitely,
+  since nothing ever told it to check again.
+- `AiManager` — memoized driver instances hold whatever `seo.ai.drivers.*`
+  said the *first* time each was resolved, baked in at construction; a
+  config change afterward (through the new dynamic settings feature, or
+  simply a deploy that changed an env var picked up mid-process by
+  something else) never reaches an already-built driver.
+- `SettingsRepository` (added just above) — `applyToConfig()` was only ever
+  called once, at boot; under a worker that stays booted for its whole life,
+  "once at boot" means "once, ever, until the worker restarts," and a
+  setting saved through the dynamic-settings API would never reach it.
+
+Fixed with a new `Contracts\ResetsBetweenRequests` interface each of the
+three now implements, and two listeners the service provider registers by
+event class *name* as a plain string — `Laravel\Octane\Events\RequestReceived`
+and `Illuminate\Queue\Events\JobProcessing` — rather than importing either
+class. Neither `laravel/octane` nor `illuminate/queue` becomes a dependency
+of this package this way: on a runtime where the matching event does not
+exist, the listener simply never fires.
+
 ### Added — dynamic settings, backed by an API
 
 `config/seo.php` was, until now, the only way to change anything — a file,

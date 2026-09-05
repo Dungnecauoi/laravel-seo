@@ -574,6 +574,28 @@ allowlist regardless of which surface is used.
 | Laravel | 12, 13 (tested) |
 | Extensions | `dom`, `json`, `libxml` (`intl` optional, with a fallback) |
 
+### Octane and long-running queue workers
+
+Supported without depending on either: a handful of this package's
+singletons cache something in an instance property rather than only in
+Laravel's own `Cache` store — `CachedRedirectMatcher`'s loaded rule set,
+`AiManager`'s built drivers, dynamic settings' applied config. Under
+ordinary PHP-FPM that never matters, since the whole container is rebuilt
+fresh every request. Under Octane (Swoole, RoadRunner, FrankenPHP) or an
+ordinary `php artisan queue:work`, the same singleton instance persists
+across many requests or jobs, and an instance property does not know a new
+one has started on its own.
+
+Both runtimes fire their own event before each unit of work —
+`Laravel\Octane\Events\RequestReceived` and `Illuminate\Queue\Events\JobProcessing`
+— and this package listens for both by the event's class name as a plain
+string, not an imported class. Neither `laravel/octane` nor `illuminate/queue`
+is a dependency of this package; the listeners simply never fire, and cost
+nothing, on a runtime where the matching event does not exist. A class that
+needs this reset implements `Contracts\ResetsBetweenRequests` — a custom
+`RedirectMatcher` or `AiDriver` a project supplies has no reason to unless it
+caches the same way.
+
 ### About Laravel 9, 10 and 11
 
 The Composer constraint still admits them, and the compatibility layer still

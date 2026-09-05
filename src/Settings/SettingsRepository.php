@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Settings;
 
+use Duxbo\Seo\Contracts\ResetsBetweenRequests;
 use Duxbo\Seo\Exceptions\UnknownSetting;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Config\Repository as Config;
@@ -21,9 +22,17 @@ use Throwable;
  * which is why nothing else in this package — `RobotsTxt`, `GlobalDefaultStage`,
  * the verification formatters — needed to change at all to support this.
  * They already read `config('seo.*')`; this only changes what that call
- * returns, called once at boot, before any of them run.
+ * returns.
+ *
+ * The service provider calls `applyToConfig()` once at boot, which is the
+ * whole story under ordinary PHP-FPM: config is re-read from scratch on
+ * every request anyway. Under a long-running worker (Octane) "boot" happens
+ * once for the worker's entire life, so `resetForNewRequest()` — called at
+ * the start of every request there — runs the exact same push again, which
+ * is how a setting saved through the API reaches an already-running worker
+ * without waiting for it to restart.
  */
-final class SettingsRepository
+final class SettingsRepository implements ResetsBetweenRequests
 {
     private const CACHE_KEY = 'duxbo.seo.settings.overrides';
 
@@ -134,6 +143,19 @@ final class SettingsRepository
         foreach ($this->all() as $key => $value) {
             $this->config->set("seo.{$key}", $value);
         }
+    }
+
+    /**
+     * Re-runs {@see applyToConfig()} — under a worker that stays booted
+     * across requests, "once at boot" would otherwise mean "once, ever,
+     * until the worker restarts," and a setting saved through the API
+     * would never reach it. Still bounded by `seo.settings.cache_ttl`
+     * underneath, so this does not turn into a database query on every
+     * single request the way naively bypassing that cache here would.
+     */
+    public function resetForNewRequest(): void
+    {
+        $this->applyToConfig();
     }
 
     private function assertAllowed(string $key): void

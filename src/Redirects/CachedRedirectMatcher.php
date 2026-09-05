@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Redirects;
 
 use Duxbo\Seo\Contracts\RedirectMatcher;
+use Duxbo\Seo\Contracts\ResetsBetweenRequests;
 use Duxbo\Seo\Data\RedirectMatch;
 use Duxbo\Seo\Enums\RedirectMatchType;
 use Duxbo\Seo\Enums\RedirectType;
@@ -18,8 +19,17 @@ use Illuminate\Contracts\Config\Repository as Config;
  * queried per request. Matching runs cheapest first: exact by hash lookup,
  * then longest-prefix, then patterns — so the expensive comparison only
  * happens for paths nothing else claimed.
+ *
+ * `$rules` is this class's *own* shortcut on top of the shared `Cache`
+ * store `flush()` already invalidates correctly — under a long-running
+ * worker this instance persists across requests, and a write from another
+ * worker's process calls that same `flush()` on a *different* instance,
+ * leaving this one still holding rules from before the edit. {@see
+ * resetForNewRequest()} exists for exactly that: drop only the local
+ * shortcut, so the next lookup re-checks the shared store, which the write
+ * already invalidated correctly regardless of which process made it.
  */
-final class CachedRedirectMatcher implements RedirectMatcher
+final class CachedRedirectMatcher implements RedirectMatcher, ResetsBetweenRequests
 {
     private const CACHE_KEY = 'seo:redirects';
 
@@ -47,6 +57,17 @@ final class CachedRedirectMatcher implements RedirectMatcher
     {
         $this->rules = null;
         $this->cache->forget(self::CACHE_KEY);
+    }
+
+    /**
+     * Unlike {@see flush()}, does not touch the shared cache — only the
+     * other workers in a pool have stale rules, not the store they all
+     * read from, and forcing every one of them to re-hit the database on
+     * every request boundary would defeat the point of caching at all.
+     */
+    public function resetForNewRequest(): void
+    {
+        $this->rules = null;
     }
 
     /**

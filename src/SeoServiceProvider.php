@@ -19,6 +19,7 @@ use Duxbo\Seo\Contracts\ContentExtractor;
 use Duxbo\Seo\Contracts\LocaleResolver;
 use Duxbo\Seo\Contracts\MetadataRepository;
 use Duxbo\Seo\Contracts\RedirectMatcher;
+use Duxbo\Seo\Contracts\ResetsBetweenRequests;
 use Duxbo\Seo\Contracts\UrlGenerator;
 use Duxbo\Seo\Formatters\ArrayFormatter;
 use Duxbo\Seo\Formatters\HeadFormatter;
@@ -124,6 +125,7 @@ final class SeoServiceProvider extends ServiceProvider
         // deep in a request three weeks from now.
         Compat::assertSupported();
 
+        $this->registerOctaneSupport();
         $this->registerBladeDirective();
         $this->registerGate();
         $this->registerRoutes();
@@ -161,6 +163,59 @@ final class SeoServiceProvider extends ServiceProvider
                 SearchConsoleSyncCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Two different runtimes keep this package's singletons alive far
+     * longer than the one request or job they were first built for — each
+     * reason is documented on {@see ResetsBetweenRequests} and on the class
+     * itself: `CachedRedirectMatcher` would keep serving a redirect list
+     * another worker already changed, `AiManager` would keep a driver built
+     * from config that has since been edited, and a dynamic setting saved
+     * through the API would never reach an already-running worker at all.
+     *
+     * - Laravel Octane (Swoole, RoadRunner, FrankenPHP) keeps the whole
+     *   application booted across many HTTP requests.
+     * - An ordinary `php artisan queue:work` does the same across many
+     *   *jobs* in one long-running process — a much more common deployment
+     *   than Octane, and just as capable of holding one of these singletons
+     *   for hours, so it gets the identical reset on every job rather than
+     *   only on the Octane-specific event.
+     *
+     * Both listened for by the event's own class name as a plain string
+     * rather than an imported class — `Laravel\Octane\Events\RequestReceived`
+     * would need Octane installed just to autoload this file, and this
+     * package declares no dependency on `illuminate/queue` either, only the
+     * `illuminate/*` components it actually uses everywhere else. Neither
+     * listener ever fires, and costs nothing, on a runtime where the
+     * matching event does not exist.
+     */
+    private function registerOctaneSupport(): void
+    {
+        $reset = function (): void {
+            foreach ($this->statefulSingletons() as $abstract) {
+                $instance = $this->app->make($abstract);
+
+                if ($instance instanceof ResetsBetweenRequests) {
+                    $instance->resetForNewRequest();
+                }
+            }
+        };
+
+        $this->app['events']->listen('Laravel\\Octane\\Events\\RequestReceived', $reset);
+        $this->app['events']->listen('Illuminate\\Queue\\Events\\JobProcessing', $reset);
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private function statefulSingletons(): array
+    {
+        return [
+            RedirectMatcher::class,
+            Ai\AiManager::class,
+            Settings\SettingsRepository::class,
+        ];
     }
 
     private function registerTokens(): void
