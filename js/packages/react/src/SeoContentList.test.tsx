@@ -44,6 +44,9 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
     createRedirect: async () => ({ id: 1 }),
     toggleRedirect: async () => ({ isActive: true }),
     deleteRedirect: async () => {},
+    dynamicSettings: async () => ({ enabled: false, settings: {} }),
+    updateDynamicSettings: async (settings) => ({ saved: Object.keys(settings) }),
+    deleteDynamicSetting: async (key) => ({ cleared: key }),
   }
 }
 

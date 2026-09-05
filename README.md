@@ -552,6 +552,11 @@ Blade panel's session routes — and this package's build output added to
 Tailwind's `content` globs, or the classes are purged and everything renders
 unstyled.
 
+`SeoSettings` also needs `seo.settings.enabled = true` for its edit form to
+appear at all — without it, the read-only status above still renders, and a
+note explains why the form is missing rather than the form silently doing
+nothing.
+
 **Blade**, for a project with none of that. `php artisan vendor:publish
 --tag=seo-views` to customise it, or use it as shipped:
 
@@ -568,7 +573,7 @@ unstyled.
 | `/seo/panel/{type}/{id}` | The single-record editor — title/description/keyword, live score |
 | `/seo/panel/redirects` | Create, toggle, and delete redirects |
 | `/seo/panel/not-found` | 404 log — prune old entries, or turn a hit straight into a redirect |
-| `/seo/panel/settings` | Read-only view of the master switch, allowlists, and enabled surfaces |
+| `/seo/panel/settings` | Read-only status, plus an edit form when `seo.settings.enabled = true` |
 
 Every page is plain `fetch()` and scoped `seo-`-prefixed CSS — no build step, no
 Tailwind requirement, no JS framework. It talks to its own routes under `web`

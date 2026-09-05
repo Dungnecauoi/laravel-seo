@@ -13,6 +13,8 @@ export type {
   ContentListResponse,
   ContentRow,
   DashboardStats,
+  DynamicSettingValue,
+  DynamicSettingsResponse,
   MetaResponse,
   NotFoundEntry,
   OpenGraphData,

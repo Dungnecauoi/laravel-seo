@@ -171,6 +171,21 @@ export interface SettingsResponse {
   supportedLocales: string[]
 }
 
+/**
+ * One allowlisted key's current state — a config-file value unless
+ * `overridden` is true. A secret key (an OAuth client secret, a refresh
+ * token) never carries `value`, only whether one `is_set`; the API does not
+ * echo a secret back once it is written.
+ */
+export type DynamicSettingValue =
+  | { value: unknown; default: unknown; overridden: boolean; secret: false }
+  | { is_set: boolean; overridden: boolean; secret: true }
+
+export interface DynamicSettingsResponse {
+  enabled: boolean
+  settings: Record<string, DynamicSettingValue>
+}
+
 export interface SeoClientOptions {
   /** Origin of the Laravel application, without a trailing slash. */
   baseUrl: string

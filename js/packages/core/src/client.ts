@@ -3,6 +3,7 @@ import type {
   AnalysisReport,
   ContentListResponse,
   DashboardStats,
+  DynamicSettingsResponse,
   MetaResponse,
   NotFoundEntry,
   OutputFormat,
@@ -36,6 +37,11 @@ export interface SeoClient {
   createRedirect(input: RedirectInput): Promise<{ id: number }>
   toggleRedirect(id: number): Promise<{ isActive: boolean }>
   deleteRedirect(id: number): Promise<void>
+
+  dynamicSettings(): Promise<DynamicSettingsResponse>
+  /** @param settings Dot-notated key => value, e.g. `{ 'verification.google': 'abc123' }`. */
+  updateDynamicSettings(settings: Record<string, unknown>): Promise<{ saved: string[] }>
+  deleteDynamicSetting(key: string): Promise<{ cleared: string }>
 }
 
 export interface AnalyzeInput {
@@ -205,6 +211,18 @@ export function createSeoClient(options: SeoClientOptions): SeoClient {
 
     async deleteRedirect(id) {
       await request(`redirects/${id}`, { method: 'DELETE' })
+    },
+
+    dynamicSettings() {
+      return request('dynamic-settings')
+    },
+
+    updateDynamicSettings(settings) {
+      return request('dynamic-settings', { method: 'PUT', body: JSON.stringify({ settings }) })
+    },
+
+    deleteDynamicSetting(key) {
+      return request(`dynamic-settings/${encodeURIComponent(key)}`, { method: 'DELETE' })
     },
   }
 }

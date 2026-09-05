@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Duxbo\Seo\Http\Controllers\PanelController;
 use Duxbo\Seo\Http\Controllers\Panel\ContentController;
 use Duxbo\Seo\Http\Controllers\Panel\DashboardController;
+use Duxbo\Seo\Http\Controllers\Panel\DynamicSettingsController;
 use Duxbo\Seo\Http\Controllers\Panel\NotFoundMonitorController;
 use Duxbo\Seo\Http\Controllers\Panel\RedirectsController;
 use Duxbo\Seo\Http\Controllers\Panel\SettingsController;
@@ -51,6 +52,7 @@ Route::prefix(config('seo.panel.prefix', 'seo/panel'))
         });
 
         Route::get('settings', SettingsController::class)->name('settings');
+        Route::put('settings', [DynamicSettingsController::class, 'update'])->name('settings.update');
 
         Route::get('{type}/{id}', [PanelController::class, 'show'])->name('show');
         Route::get('{type}/{id}/data', [PanelController::class, 'data'])->name('data');

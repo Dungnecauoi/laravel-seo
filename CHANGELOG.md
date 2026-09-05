@@ -73,6 +73,28 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — an edit form for dynamic settings, in all three UIs
+
+Dynamic settings shipped with a REST API and no UI at all — a project had to
+build its own settings page to use it. All three UIs' Settings surface now
+does that: the same read-only status stays at the top, and when
+`seo.settings.enabled` is true, an edit form for every allowlisted key
+appears below it, grouped the same way in Blade, React and Vue — general,
+meta defaults, verification, robots & schema, IndexNow, Search Console.
+Saved immediately over the same `SettingsRepository` / `/dynamic-settings`
+API the last two entries in this file built. A secret field (client secret,
+refresh token) shows only whether one `is_set`, never its value, with a
+blank input meaning "leave it" rather than "clear it" — the same contract
+the API already made.
+
+Caught by a real test, not just written and assumed correct: the Blade
+view's first draft used `data_get($dynamicSettings, "{$key}.value")`, which
+splits its path on every dot — the wrong tool for an array keyed by dotted
+strings like `'defaults.title'` as one flat key rather than a nested
+structure, and it silently returned null for every setting but the two
+whose name happened to contain no dot. Fixed to plain array access; the
+failing assertion this surfaced remains committed as a regression test.
+
 ### Added — Groq and OpenRouter AI drivers
 
 Both speak OpenAI's own Chat Completions shape, which OpenAI itself,

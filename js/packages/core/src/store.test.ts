@@ -44,6 +44,9 @@ function stubClient(overrides: Partial<SeoClient> = {}): SeoClient {
     createRedirect: async () => ({ id: 1 }),
     toggleRedirect: async () => ({ isActive: true }),
     deleteRedirect: async () => {},
+    dynamicSettings: async () => ({ enabled: false, settings: {} }),
+    updateDynamicSettings: async (settings) => ({ saved: Object.keys(settings) }),
+    deleteDynamicSetting: async (key) => ({ cleared: key }),
     ...overrides,
   }
 }

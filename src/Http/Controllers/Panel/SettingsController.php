@@ -4,17 +4,23 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Http\Controllers\Panel;
 
+use Duxbo\Seo\Settings\SettingsRepository;
 use Illuminate\Contracts\View\View;
 
 /**
- * Read-only. Editing config/seo.php through a web form would mean either
- * writing PHP back to disk (fragile, and a deploy can overwrite it anyway)
- * or a second, database-backed settings store shadowing the config file —
- * both a bigger commitment than this panel makes. Showing what is actually
- * in effect, including the demo-domain switch, is the useful 80% without it.
+ * The top half is read-only status — the effective config a deploy set,
+ * including the demo-domain switch, whether editable here or not. The
+ * bottom half, when `seo.settings.enabled` is true, is the same
+ * allowlisted keys {@see \Duxbo\Seo\Http\Api\V1\DynamicSettingsController}
+ * exposes over the REST API, edited here instead through the session the
+ * rest of this panel already uses.
  */
 final class SettingsController
 {
+    public function __construct(private readonly SettingsRepository $settings)
+    {
+    }
+
     public function __invoke(): View
     {
         return view('seo::panel.settings', [
@@ -30,6 +36,45 @@ final class SettingsController
             'aiBudget' => config('seo.ai.daily_token_budget', 0),
             'analysisRateLimit' => config('seo.analysis.rate_limit', '30,1'),
             'supportedLocales' => config('seo.locales.supported', []),
+
+            'dynamicSettingsEnabled' => $this->settings->enabled(),
+            'dynamicSettings' => $this->dynamicSettingsForView(),
         ]);
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function dynamicSettingsForView(): array
+    {
+        if (! $this->settings->enabled()) {
+            return [];
+        }
+
+        $data = [];
+
+        foreach ($this->settings->allowedKeys() as $key) {
+            $overridden = $this->settings->has($key);
+
+            if ($this->settings->isSecret($key)) {
+                $raw = $overridden ? $this->settings->get($key) : config("seo.{$key}");
+
+                $data[$key] = [
+                    'is_set' => is_string($raw) && $raw !== '',
+                    'overridden' => $overridden,
+                    'secret' => true,
+                ];
+
+                continue;
+            }
+
+            $data[$key] = [
+                'value' => $overridden ? $this->settings->get($key) : config("seo.{$key}"),
+                'overridden' => $overridden,
+                'secret' => false,
+            ];
+        }
+
+        return $data;
     }
 }
