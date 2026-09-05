@@ -73,6 +73,21 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — Groq and OpenRouter AI drivers
+
+Both speak OpenAI's own Chat Completions shape, which OpenAI itself,
+`OpenAiDriver` and now `GroqDriver` / `OpenRouterDriver` all share through
+a new `OpenAiCompatibleDriver` — `OpenAiDriver` used to carry that request
+and response handling directly, but `final class` blocked reuse by
+inheritance, so it moved to a common (non-final) base the way `HttpDriver`
+already sits under all four HTTP-based drivers. Reached the same way as
+every other driver: `seo.ai.drivers.groq` / `.openrouter`, a `key`, and a
+`model` — one that actually honours `response_format: json_schema`, since
+structured-output support depends on the underlying model, not on either
+platform. `OpenRouterDriver` additionally sends the optional `HTTP-Referer`
+/ `X-Title` headers OpenRouter's own docs ask for, when `referer` / `title`
+are configured.
+
 ### Fixed — dynamic settings could echo back an OAuth client secret and refresh token
 
 `GET /api/seo/v1/dynamic-settings` returned the literal value of every

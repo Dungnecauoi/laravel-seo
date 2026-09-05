@@ -30,6 +30,10 @@ final class AiTest extends TestCase
         $app['config']->set('seo.ai.drivers.openai.model', 'gpt-test');
         $app['config']->set('seo.ai.drivers.gemini.key', 'test-key');
         $app['config']->set('seo.ai.drivers.gemini.model', 'gemini-test');
+        $app['config']->set('seo.ai.drivers.groq.key', 'test-key');
+        $app['config']->set('seo.ai.drivers.groq.model', 'llama-test');
+        $app['config']->set('seo.ai.drivers.openrouter.key', 'test-key');
+        $app['config']->set('seo.ai.drivers.openrouter.model', 'anthropic/claude-test');
     }
 
     public function test_the_default_driver_does_nothing_and_costs_nothing(): void
@@ -86,6 +90,73 @@ final class AiTest extends TestCase
             $this->assertTrue($schema['strict']);
             $this->assertFalse($schema['schema']['additionalProperties']);
             $this->assertSame(['title', 'description'], $schema['schema']['required']);
+
+            return true;
+        });
+    }
+
+    public function test_groq_speaks_the_same_shape_as_openai_against_its_own_host(): void
+    {
+        Http::fake(['api.groq.com/*' => Http::response([
+            'model' => 'llama-test',
+            'choices' => [['message' => ['content' => '{"title":"Tiêu đề","description":"Mô tả"}']]],
+            'usage' => ['prompt_tokens' => 40, 'completion_tokens' => 8],
+        ])]);
+
+        $this->assertSame('Tiêu đề', $this->ai()->complete($this->request(), 'groq')->get('title'));
+
+        Http::assertSent(function ($request): bool {
+            $this->assertStringContainsString('api.groq.com/openai/v1/chat/completions', $request->url());
+            $this->assertTrue($request->data()['response_format']['json_schema']['strict']);
+
+            return true;
+        });
+    }
+
+    public function test_openrouter_sends_the_optional_attribution_headers_when_configured(): void
+    {
+        config([
+            'seo.ai.drivers.openrouter.referer' => 'https://trangcuatoi.vn',
+            'seo.ai.drivers.openrouter.title' => 'Trang Của Tôi',
+        ]);
+
+        Http::fake(['openrouter.ai/*' => Http::response([
+            'model' => 'anthropic/claude-test',
+            'choices' => [['message' => ['content' => '{"title":"Tiêu đề","description":"Mô tả"}']]],
+            'usage' => ['prompt_tokens' => 30, 'completion_tokens' => 6],
+        ])]);
+
+        $this->assertSame('Tiêu đề', $this->ai()->complete($this->request(), 'openrouter')->get('title'));
+
+        Http::assertSent(function ($request): bool {
+            $this->assertStringContainsString('openrouter.ai/api/v1/chat/completions', $request->url());
+            $this->assertSame('https://trangcuatoi.vn', $request->header('HTTP-Referer')[0]);
+            $this->assertSame('Trang Của Tôi', $request->header('X-Title')[0]);
+
+            return true;
+        });
+    }
+
+    public function test_openrouter_omits_the_attribution_headers_when_not_configured(): void
+    {
+        // Explicitly cleared rather than trusting the config file's own
+        // env()-derived defaults to be empty in whatever shell runs this suite.
+        config([
+            'seo.ai.drivers.openrouter.referer' => null,
+            'seo.ai.drivers.openrouter.title' => null,
+        ]);
+
+        Http::fake(['openrouter.ai/*' => Http::response([
+            'model' => 'anthropic/claude-test',
+            'choices' => [['message' => ['content' => '{"title":"Tiêu đề","description":"Mô tả"}']]],
+            'usage' => ['prompt_tokens' => 30, 'completion_tokens' => 6],
+        ])]);
+
+        $this->ai()->complete($this->request(), 'openrouter');
+
+        Http::assertSent(function ($request): bool {
+            $this->assertSame([], $request->header('HTTP-Referer'));
+            $this->assertSame([], $request->header('X-Title'));
 
             return true;
         });

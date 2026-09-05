@@ -7,8 +7,10 @@ namespace Duxbo\Seo\Ai;
 use Closure;
 use Duxbo\Seo\Ai\Drivers\ClaudeDriver;
 use Duxbo\Seo\Ai\Drivers\GeminiDriver;
+use Duxbo\Seo\Ai\Drivers\GroqDriver;
 use Duxbo\Seo\Ai\Drivers\NullDriver;
 use Duxbo\Seo\Ai\Drivers\OpenAiDriver;
+use Duxbo\Seo\Ai\Drivers\OpenRouterDriver;
 use Duxbo\Seo\Contracts\AiDriver;
 use Duxbo\Seo\Contracts\ResetsBetweenRequests;
 use Duxbo\Seo\Data\AiRequest;
@@ -172,6 +174,8 @@ final class AiManager implements ResetsBetweenRequests
             'claude' => new ClaudeDriver($http, $config),
             'openai' => new OpenAiDriver($http, $config),
             'gemini' => new GeminiDriver($http, $config),
+            'groq' => new GroqDriver($http, $config),
+            'openrouter' => new OpenRouterDriver($http, $config),
             default => throw new InvalidArgumentException(
                 "No SEO AI driver named [{$name}]. Register one with Seo::ai()->extend()."
             ),

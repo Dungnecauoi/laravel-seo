@@ -489,11 +489,19 @@ Seo::ai()->suggestKeywords($html, 'vi');
 Seo::ai()->extend('my-llm', fn () => new MyDriver());
 ```
 
-Claude, OpenAI and Gemini are reached over plain REST through Laravel's HTTP
-client; no vendor SDK is required or even suggested. Each driver asks its
-provider for schema-constrained output — tool use, `json_schema`,
-`responseSchema` — and prose where an object was expected is an error, never
-something to parse.
+Claude, OpenAI, Gemini, Groq and OpenRouter are reached over plain REST
+through Laravel's HTTP client; no vendor SDK is required or even suggested.
+Each driver asks its provider for schema-constrained output — tool use,
+`json_schema`, `responseSchema` — and prose where an object was expected is
+an error, never something to parse.
+
+Groq and OpenRouter both speak OpenAI's own Chat Completions shape, so their
+drivers are a few lines each over a shared `OpenAiCompatibleDriver` —
+`seo.ai.drivers.groq.model`/`.openrouter.model` need to name a model that
+actually honours `response_format: json_schema`, since that support depends
+on the underlying model, not on either platform itself. `Seo::ai()->extend()`
+reaches any other OpenAI-compatible endpoint (a self-hosted vLLM server, for
+instance) the same way, or a genuinely different API shape entirely.
 
 Prompts are translated, not just their output: an English instruction asking
 for a Vietnamese description reliably produces stilted Vietnamese. Results are

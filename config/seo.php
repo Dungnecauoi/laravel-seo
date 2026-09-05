@@ -588,7 +588,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Off by default: installing a package must never start billing anyone.
-    | Set 'default' to claude, openai or gemini once a key is configured.
+    | Set 'default' to claude, openai, gemini, groq or openrouter once a key
+    | is configured.
     |
     | Drivers call plain documented REST through Laravel's HTTP client. No
     | vendor SDK is required or suggested — three SDKs would be three more
@@ -625,6 +626,26 @@ return [
                 'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
                 'timeout' => 30,
                 'retries' => 2,
+            ],
+
+            'groq' => [
+                'key' => env('GROQ_API_KEY'),
+                'model' => env('SEO_AI_MODEL'),
+                'base_url' => 'https://api.groq.com/openai/v1',
+                'timeout' => 30,
+                'retries' => 2,
+            ],
+
+            'openrouter' => [
+                'key' => env('OPENROUTER_API_KEY'),
+                'model' => env('SEO_AI_MODEL'),
+                'base_url' => 'https://openrouter.ai/api/v1',
+                'timeout' => 30,
+                'retries' => 2,
+                // Optional — OpenRouter's own docs ask for these for its
+                // public leaderboard attribution, not for the request to work.
+                'referer' => env('APP_URL'),
+                'title' => env('SEO_SITE_NAME', env('APP_NAME')),
             ],
         ],
 
