@@ -176,6 +176,10 @@
                     'seo.panel.content' => 'Nội dung',
                     'seo.panel.redirects.index' => 'Chuyển hướng',
                     'seo.panel.not-found.index' => '404',
+                    'seo.panel.audit-history' => 'Lịch sử audit',
+                    'seo.panel.internal-links' => 'Liên kết nội bộ',
+                    'seo.panel.search-console' => 'Search Console',
+                    'seo.panel.indexnow-log' => 'IndexNow',
                     'seo.panel.settings' => 'Cấu hình',
                 ];
             @endphp

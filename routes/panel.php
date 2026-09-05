@@ -3,11 +3,15 @@
 declare(strict_types=1);
 
 use Duxbo\Seo\Http\Controllers\PanelController;
+use Duxbo\Seo\Http\Controllers\Panel\AuditHistoryController;
 use Duxbo\Seo\Http\Controllers\Panel\ContentController;
 use Duxbo\Seo\Http\Controllers\Panel\DashboardController;
 use Duxbo\Seo\Http\Controllers\Panel\DynamicSettingsController;
+use Duxbo\Seo\Http\Controllers\Panel\IndexNowLogController;
+use Duxbo\Seo\Http\Controllers\Panel\InternalLinksController;
 use Duxbo\Seo\Http\Controllers\Panel\NotFoundMonitorController;
 use Duxbo\Seo\Http\Controllers\Panel\RedirectsController;
+use Duxbo\Seo\Http\Controllers\Panel\SearchConsoleStatsController;
 use Duxbo\Seo\Http\Controllers\Panel\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -53,6 +57,11 @@ Route::prefix(config('seo.panel.prefix', 'seo/panel'))
 
         Route::get('settings', SettingsController::class)->name('settings');
         Route::put('settings', [DynamicSettingsController::class, 'update'])->name('settings.update');
+
+        Route::get('audit-history', AuditHistoryController::class)->name('audit-history');
+        Route::get('internal-links', InternalLinksController::class)->name('internal-links');
+        Route::get('search-console', SearchConsoleStatsController::class)->name('search-console');
+        Route::get('indexnow-log', IndexNowLogController::class)->name('indexnow-log');
 
         Route::get('{type}/{id}', [PanelController::class, 'show'])->name('show');
         Route::get('{type}/{id}/data', [PanelController::class, 'data'])->name('data');

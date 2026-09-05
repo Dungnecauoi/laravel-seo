@@ -3,13 +3,17 @@
 declare(strict_types=1);
 
 use Duxbo\Seo\Http\Api\V1\AnalyzeController;
+use Duxbo\Seo\Http\Api\V1\AuditHistoryController;
 use Duxbo\Seo\Http\Api\V1\ContentController;
 use Duxbo\Seo\Http\Api\V1\DashboardController;
 use Duxbo\Seo\Http\Api\V1\DynamicSettingsController;
+use Duxbo\Seo\Http\Api\V1\IndexNowLogController;
+use Duxbo\Seo\Http\Api\V1\InternalLinksController;
 use Duxbo\Seo\Http\Api\V1\MetaController;
 use Duxbo\Seo\Http\Api\V1\NotFoundController;
 use Duxbo\Seo\Http\Api\V1\RedirectsController;
 use Duxbo\Seo\Http\Api\V1\ResolveController;
+use Duxbo\Seo\Http\Api\V1\SearchConsoleStatsController;
 use Duxbo\Seo\Http\Api\V1\SettingsController;
 use Illuminate\Support\Facades\Route;
 
@@ -69,4 +73,12 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
             Route::patch('{id}/toggle', [RedirectsController::class, 'toggle'])->whereNumber('id');
             Route::delete('{id}', [RedirectsController::class, 'destroy'])->whereNumber('id');
         });
+
+        // Read sides of console-only commands — the command does the work
+        // (a full-site crawl or an API sync does not belong on a request a
+        // page load waits on), these just expose what it already wrote.
+        Route::get('audit-history', [AuditHistoryController::class, 'index']);
+        Route::get('internal-links', [InternalLinksController::class, 'index']);
+        Route::get('search-console/stats', [SearchConsoleStatsController::class, 'index']);
+        Route::get('indexnow/log', [IndexNowLogController::class, 'index']);
     });
