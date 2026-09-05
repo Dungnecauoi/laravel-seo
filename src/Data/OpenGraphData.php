@@ -50,6 +50,37 @@ final class OpenGraphData
             && $this->url === null;
     }
 
+    /**
+     * Field by field, not the whole object: a record that maps its own
+     * `og.title` but never sets `og.image` must still pick up a site-wide
+     * default image from a later stage. Falling back to `$fallback` only
+     * when *this* object is entirely null — the mistake this replaces —
+     * meant the one og.* field a record did set was enough to block every
+     * other field from ever falling back to anything, at every stage of
+     * the pipeline this runs in.
+     */
+    public function fillMissingFrom(self $fallback): self
+    {
+        return new self(
+            title: $this->title ?? $fallback->title,
+            description: $this->description ?? $fallback->description,
+            image: $this->image ?? $fallback->image,
+            imageAlt: $this->imageAlt ?? $fallback->imageAlt,
+            imageWidth: $this->imageWidth ?? $fallback->imageWidth,
+            imageHeight: $this->imageHeight ?? $fallback->imageHeight,
+            type: $this->type ?? $fallback->type,
+            url: $this->url ?? $fallback->url,
+            siteName: $this->siteName ?? $fallback->siteName,
+            locale: $this->locale ?? $fallback->locale,
+            alternateLocales: $this->alternateLocales !== [] ? $this->alternateLocales : $fallback->alternateLocales,
+            publishedTime: $this->publishedTime ?? $fallback->publishedTime,
+            modifiedTime: $this->modifiedTime ?? $fallback->modifiedTime,
+            author: $this->author ?? $fallback->author,
+            section: $this->section ?? $fallback->section,
+            tags: $this->tags !== [] ? $this->tags : $fallback->tags,
+        );
+    }
+
     public function isArticle(): bool
     {
         return $this->type === 'article';

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Tests\Unit;
 
+use Duxbo\Seo\Data\OpenGraphData;
 use Duxbo\Seo\Data\RobotsRule;
 use Duxbo\Seo\Data\SeoData;
+use Duxbo\Seo\Data\TwitterData;
 use Duxbo\Seo\Enums\RobotsDirective;
 use Duxbo\Seo\Exceptions\InvalidSeoData;
 use PHPUnit\Framework\TestCase;
@@ -44,6 +46,40 @@ final class SeoDataTest extends TestCase
 
         $this->assertSame('Kept', $result->title);
         $this->assertSame('Adopted', $result->description);
+    }
+
+    public function test_fill_missing_merges_open_graph_field_by_field_instead_of_as_a_whole_object(): void
+    {
+        // Record only mapped og.title — the common case for real posts. The
+        // pipeline still builds a non-null OpenGraphData for it, with every
+        // other field null. A later stage (site-wide default) supplies image.
+        $decided = new SeoData(openGraph: new OpenGraphData(title: 'Post title'));
+        $fallback = new SeoData(openGraph: new OpenGraphData(image: '/default-og.png'));
+
+        $result = $decided->fillMissingFrom($fallback);
+
+        $this->assertSame('Post title', $result->openGraph->title);
+        $this->assertSame('/default-og.png', $result->openGraph->image);
+    }
+
+    public function test_fill_missing_merges_twitter_field_by_field_instead_of_as_a_whole_object(): void
+    {
+        $decided = new SeoData(twitter: new TwitterData(title: 'Post title'));
+        $fallback = new SeoData(twitter: new TwitterData(image: '/default-twitter.png'));
+
+        $result = $decided->fillMissingFrom($fallback);
+
+        $this->assertSame('Post title', $result->twitter->title);
+        $this->assertSame('/default-twitter.png', $result->twitter->image);
+    }
+
+    public function test_fill_missing_open_graph_falls_back_to_the_whole_object_when_undecided(): void
+    {
+        $fallback = new OpenGraphData(title: 'Fallback title', image: '/fallback.png');
+
+        $result = (new SeoData())->fillMissingFrom(new SeoData(openGraph: $fallback));
+
+        $this->assertSame($fallback, $result->openGraph);
     }
 
     public function test_fill_missing_treats_an_empty_robots_list_as_undecided(): void

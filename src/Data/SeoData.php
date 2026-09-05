@@ -47,6 +47,13 @@ final class SeoData
      *
      * The backbone of the fallback chain: a stage produces candidate values and
      * hands them here, and anything already set survives untouched.
+     *
+     * `openGraph` and `twitter` merge field by field rather than falling back
+     * as a whole object — a record whose only og.* mapping is `og.title`
+     * still produces a non-null `OpenGraphData` with every other field null,
+     * and `$this->openGraph ?? $fallback->openGraph` would have picked that
+     * object outright and discarded a later stage's `og.image` default along
+     * with it, for every field the record never touched.
      */
     public function fillMissingFrom(self $fallback): self
     {
@@ -55,13 +62,34 @@ final class SeoData
             description: $this->description ?? $fallback->description,
             canonical: $this->canonical ?? $fallback->canonical,
             robots: $this->robots !== [] ? $this->robots : $fallback->robots,
-            openGraph: $this->openGraph ?? $fallback->openGraph,
-            twitter: $this->twitter ?? $fallback->twitter,
+            openGraph: self::mergeNested($this->openGraph, $fallback->openGraph),
+            twitter: self::mergeNested($this->twitter, $fallback->twitter),
             focusKeyword: $this->focusKeyword ?? $fallback->focusKeyword,
             secondaryKeywords: $this->secondaryKeywords !== [] ? $this->secondaryKeywords : $fallback->secondaryKeywords,
             score: $this->score ?? $fallback->score,
             extra: $this->extra + $fallback->extra,
         );
+    }
+
+    /**
+     * @template T of OpenGraphData|TwitterData
+     * @param  T|null  $current
+     * @param  T|null  $fallback
+     * @return T|null
+     */
+    private static function mergeNested(?object $current, ?object $fallback): ?object
+    {
+        if ($current === null) {
+            return $fallback;
+        }
+
+        if ($fallback === null) {
+            return $current;
+        }
+
+        /** @var T $current */
+        /** @var T $fallback */
+        return $current->fillMissingFrom($fallback);
     }
 
     public function hasRobotsDirective(string $directive): bool

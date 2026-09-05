@@ -31,6 +31,25 @@ final class TwitterData
     }
 
     /**
+     * Field by field, not the whole object — see
+     * {@see OpenGraphData::fillMissingFrom()} for why: a record that maps
+     * only `twitter.title` must still be able to fall back to a site-wide
+     * default `twitter.image` from a later pipeline stage.
+     */
+    public function fillMissingFrom(self $fallback): self
+    {
+        return new self(
+            card: $this->card ?? $fallback->card,
+            site: $this->site ?? $fallback->site,
+            creator: $this->creator ?? $fallback->creator,
+            title: $this->title ?? $fallback->title,
+            description: $this->description ?? $fallback->description,
+            image: $this->image ?? $fallback->image,
+            imageAlt: $this->imageAlt ?? $fallback->imageAlt,
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function constructorArgs(): array

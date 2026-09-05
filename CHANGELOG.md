@@ -139,6 +139,23 @@ platform. `OpenRouterDriver` additionally sends the optional `HTTP-Referer`
 / `X-Title` headers OpenRouter's own docs ask for, when `referer` / `title`
 are configured.
 
+### Fixed — `og.image` / `twitter.image` disappeared for any record that set another `og.*` field
+
+`SeoData::fillMissingFrom()` merged `openGraph` and `twitter` as whole objects
+— `$this->openGraph ?? $fallback->openGraph` — instead of field by field. The
+resolution pipeline builds a non-null `OpenGraphData` the moment a record maps
+even one `og.*` key, so a post that maps only `og.title` (the common case)
+already carried a "decided" `OpenGraphData` with `image` null by the time a
+later stage — a model-attribute mapping, or a site-wide `seo.defaults`
+override — tried to supply an image. The whole-object fallback saw the
+earlier object as final and discarded the later one outright, image included.
+Every stage boundary in the pipeline (`StoredValue` → `ModelAttribute` →
+`Template` → `GlobalDefault`) was affected, not only the last one. Fixed by
+giving `OpenGraphData` and `TwitterData` their own `fillMissingFrom()` that
+merges per field, the same way `SeoData` already treats its own scalar
+fields, so a record can decide `og.title` on its own while still inheriting
+`og.image` from whichever later stage sets one.
+
 ### Fixed — dynamic settings could echo back an OAuth client secret and refresh token
 
 `GET /api/seo/v1/dynamic-settings` returned the literal value of every
