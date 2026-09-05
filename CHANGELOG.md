@@ -73,6 +73,32 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Added — internal link graph, Search Console sync
+
+The other two real gaps from the same table-by-table comparison, both
+genuinely free (no paid third-party service, unlike keyword rank tracking):
+
+- **Internal links** — `php artisan seo:internal-links {model} --content={attribute}`
+  crawls one model's own content for internal links, reusing the same
+  `ContentExtractor` the analyser already runs rather than a second HTML
+  parser, and reports which of its own pages nothing in that set links to.
+  Matching is by URL path rather than full URL on purpose: a href made
+  absolute against `app.url` and a model's own `seoUrl()` override can
+  legitimately disagree on scheme or host, and comparing full URLs would
+  report a page as orphaned over that mismatch alone rather than a real
+  missing link. Every crawl replaces one record's rows in
+  `seo_internal_links` outright.
+- **Search Console sync** — `php artisan seo:search-console:sync` pulls
+  clicks, impressions, CTR and position per page into
+  `seo_search_console_stats`. Free, but distinct from keyword rank
+  tracking: it only ever reports on pages Google has already indexed and
+  shown in a real result, never an arbitrary keyword chosen in advance,
+  which is what a paid SERP-tracking service is for instead. Needs a
+  one-time manual OAuth setup outside the package (a Google Cloud project,
+  an OAuth client, one consent-screen visit for a refresh token) — this
+  package never runs that consent flow itself, only the resulting refresh
+  token afterward.
+
 ### Added — schema escape hatches, IndexNow submission log, audit history
 
 Compared this package's tables against a competing SEO module's schema

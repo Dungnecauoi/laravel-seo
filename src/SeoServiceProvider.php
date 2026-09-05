@@ -11,7 +11,9 @@ use Duxbo\Seo\Console\AuditCommand;
 use Duxbo\Seo\Console\DuplicatesCommand;
 use Duxbo\Seo\Console\HreflangAuditCommand;
 use Duxbo\Seo\Console\IndexNowCommand;
+use Duxbo\Seo\Console\InternalLinksCommand;
 use Duxbo\Seo\Console\PruneNotFoundCommand;
+use Duxbo\Seo\Console\SearchConsoleSyncCommand;
 use Duxbo\Seo\Console\SitemapCommand;
 use Duxbo\Seo\Contracts\ContentExtractor;
 use Duxbo\Seo\Contracts\LocaleResolver;
@@ -131,6 +133,8 @@ final class SeoServiceProvider extends ServiceProvider
                 HreflangAuditCommand::class,
                 IndexNowCommand::class,
                 AuditCommand::class,
+                InternalLinksCommand::class,
+                SearchConsoleSyncCommand::class,
             ]);
         }
     }

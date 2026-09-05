@@ -418,6 +418,53 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Internal link graph
+    |--------------------------------------------------------------------------
+    |
+    | `php artisan seo:internal-links` writes here — which pages a model's own
+    | content links to, so an orphan (a page nothing else links to) can be
+    | found without a manual click-through of the whole site. Every crawl of
+    | one record replaces its rows outright rather than diffing them, so
+    | removing a link from the content removes it here too on the next run.
+    |
+    */
+
+    'internal_links' => [
+        'table' => 'seo_internal_links',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search Console
+    |--------------------------------------------------------------------------
+    |
+    | Free, unlike keyword rank tracking — but it only ever reports on pages
+    | Google has already indexed and shown in a real result, not an arbitrary
+    | keyword picked in advance, which is the actual difference between this
+    | and a paid SERP-tracking service.
+    |
+    | Needs a one-time manual setup this package cannot do for a project: a
+    | Google Cloud project with the Search Console API enabled, an OAuth
+    | client (Credentials → OAuth client ID → Desktop app), and a refresh
+    | token obtained once by sending that client through the consent screen
+    | yourself — the package only ever uses the refresh token afterward, it
+    | never runs the consent flow itself. `site_url` is the exact property
+    | string Search Console shows for the verified property, e.g.
+    | 'https://trangcuatoi.vn/' or 'sc-domain:trangcuatoi.vn'.
+    |
+    */
+
+    'search_console' => [
+        'enabled' => env('SEO_SEARCH_CONSOLE_ENABLED', false),
+        'client_id' => env('SEO_SEARCH_CONSOLE_CLIENT_ID'),
+        'client_secret' => env('SEO_SEARCH_CONSOLE_CLIENT_SECRET'),
+        'refresh_token' => env('SEO_SEARCH_CONSOLE_REFRESH_TOKEN'),
+        'site_url' => env('SEO_SEARCH_CONSOLE_SITE_URL'),
+        'table' => 'seo_search_console_stats',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Redirects
     |--------------------------------------------------------------------------
     |

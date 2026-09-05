@@ -289,6 +289,65 @@ holds that — `--content` names it, the same way `seo.models.*.route` exists
 for URLs rather than this package guessing a column name. Schedule it
 yourself with Laravel's own scheduler if a project wants it to run nightly.
 
+### Internal links
+
+```bash
+php artisan seo:internal-links "App\Models\Post" --content=body
+```
+
+Crawls one model's own content for internal links — reusing the same
+`ContentExtractor` the analyser already uses, not a second HTML parser — and
+reports which of its own pages nothing in that set links to. A blog with a
+hundred posts that never link to each other is exactly what this catches.
+Matching is done by URL *path*, deliberately: a href made absolute against
+`app.url` and a model's own `seoUrl()` override can legitimately disagree on
+scheme or host (a CDN domain, a reverse proxy, `app.url` simply not matching
+what a model returns), and comparing the full URL would report a page as
+orphaned over that mismatch alone. Every crawl of one record replaces its
+rows in `seo_internal_links` outright, so removing a link from the content
+removes it here too on the next run — nothing accumulates.
+
+Scoped to one model at a time rather than a true site-wide graph across every
+exposed type, the same boundary `seo:duplicates` and `seo:hreflang` draw:
+useful without needing every model in the application registered here the
+way `seo.api.models` is for the REST API.
+
+### Search Console stats
+
+```bash
+php artisan seo:search-console:sync --days=30
+```
+
+Pulls clicks, impressions, CTR and average position per page from the Search
+Console API into `seo_search_console_stats` — free, but only for pages
+Google has already indexed and shown in a real result, which is what
+actually separates this from keyword rank tracking. A rank tracker answers
+"where do I rank for a keyword I chose," which Google has no free API for at
+all; this only ever answers "how are the pages I already have doing."
+
+Off by default, and needs a one-time manual setup this package cannot do on
+a project's behalf: a Google Cloud project with the Search Console API
+enabled, an OAuth client (Desktop app type), and a refresh token obtained
+once by sending that client through Google's consent screen yourself. This
+package never runs that consent flow — only the resulting refresh token,
+which does not expire the way an access token does, is ever used here:
+
+```php
+'search_console' => [
+    'enabled' => true,
+    'client_id' => env('SEO_SEARCH_CONSOLE_CLIENT_ID'),
+    'client_secret' => env('SEO_SEARCH_CONSOLE_CLIENT_SECRET'),
+    'refresh_token' => env('SEO_SEARCH_CONSOLE_REFRESH_TOKEN'),
+    'site_url' => env('SEO_SEARCH_CONSOLE_SITE_URL'), // e.g. 'https://trangcuatoi.vn/'
+],
+```
+
+`--days` sets the lookback window, ending 3 days back rather than today —
+Search Console's own numbers for a day keep shifting for about 48 hours
+after it happens, and syncing too early just means syncing the same day
+again once the real numbers land. Re-running the sync updates a day's row
+rather than duplicating it.
+
 ### Redirects and the 404 monitor
 
 ```php
