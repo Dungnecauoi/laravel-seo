@@ -59,6 +59,28 @@ final class SettingsRepository implements ResetsBetweenRequests
     }
 
     /**
+     * Keys still writable through {@see set()} like any other, but whose
+     * value a caller must never be able to read back — an OAuth client
+     * secret or refresh token, unlike most settings here, has no
+     * legitimate reason to be echoed to whatever already knows it well
+     * enough to have set it in the first place.
+     *
+     * @return list<string>
+     */
+    public function secretKeys(): array
+    {
+        /** @var list<string> $keys */
+        $keys = $this->config->get('seo.settings.secret_keys', []);
+
+        return $keys;
+    }
+
+    public function isSecret(string $key): bool
+    {
+        return in_array($key, $this->secretKeys(), true);
+    }
+
+    /**
      * Every stored override, dot-key => decoded value. Empty when disabled
      * or when the table has not been migrated yet — a project that never
      * opted in must never have a request fail over a table that, by design,

@@ -28,13 +28,32 @@ final class DynamicSettingsController extends ApiController
         $data = [];
 
         foreach ($keys as $key) {
-            $default = config("seo.{$key}");
             $overridden = $this->settings->has($key);
+
+            if ($this->settings->isSecret($key)) {
+                // Never the value, not even the one still sitting in
+                // config/seo.php — a client secret or refresh token is
+                // exactly as sensitive whether it came from the file or a
+                // stored override, and neither has a safe partial-reveal
+                // convention the way a card number's last four digits does.
+                $raw = $overridden ? $this->settings->get($key) : config("seo.{$key}");
+
+                $data[$key] = [
+                    'is_set' => is_string($raw) && $raw !== '',
+                    'overridden' => $overridden,
+                    'secret' => true,
+                ];
+
+                continue;
+            }
+
+            $default = config("seo.{$key}");
 
             $data[$key] = [
                 'value' => $overridden ? $this->settings->get($key) : $default,
                 'default' => $default,
                 'overridden' => $overridden,
+                'secret' => false,
             ];
         }
 

@@ -461,6 +461,22 @@ already reading `config()`. Only the dot-notated keys listed in
 behind `seo.api.models` allowlisting which model types the API can touch,
 rather than accepting any key a caller names.
 
+`seo.settings.secret_keys` — a subset of the above, currently
+`search_console.client_secret` and `search_console.refresh_token` — are
+still writable through the same `PUT`, but `GET` never echoes their value
+back, not even the one already sitting in `config/seo.php`:
+
+```json
+{ "search_console.refresh_token": { "is_set": true, "overridden": true, "secret": true } }
+```
+
+An OAuth client secret or refresh token has no legitimate reason to be
+readable again once it is set, and no safe partial-reveal convention the way
+a card number's last four digits does — unlike `indexnow.key`, published on
+purpose at `/{key}.txt`, or `search_console.client_id`, routinely visible in
+a browser's own OAuth redirect URL, both of which report their real `value`
+like anything else here.
+
 ### AI assistance
 
 Off by default, because installing a package must never start billing anyone.

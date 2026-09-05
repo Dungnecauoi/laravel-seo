@@ -517,6 +517,17 @@ return [
             'search_console.refresh_token',
             'search_console.site_url',
         ],
+
+        // Still writable through the same PUT — this only changes what GET
+        // ever echoes back. A client secret and a refresh token grant
+        // access to Google on this site's behalf; unlike indexnow.key
+        // (published at /{key}.txt on purpose) or client_id (routinely
+        // visible in a browser's own OAuth redirect), neither has any
+        // legitimate reason to be readable again once it is set.
+        'secret_keys' => [
+            'search_console.client_secret',
+            'search_console.refresh_token',
+        ],
     ],
 
     /*

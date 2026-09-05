@@ -73,6 +73,22 @@ provider. The fixed-segment routes (`redirects`, `not-found`, `content`,
 hits every one of them for real rather than trusting that the segment counts
 can't collide.
 
+### Fixed — dynamic settings could echo back an OAuth client secret and refresh token
+
+`GET /api/seo/v1/dynamic-settings` returned the literal value of every
+allowlisted key, `search_console.client_secret` and
+`search_console.refresh_token` included — gated by the same Gate as the rest
+of the API, so not publicly reachable, but still a real credential exposed
+to anyone with panel access rather than only whoever set it. A new
+`seo.settings.secret_keys` list (currently those two) makes `SettingsRepository`
+and `DynamicSettingsController::index()` report `{ is_set, overridden, secret: true }`
+for a secret key instead of its value — still writable through the same
+`PUT`, never readable back afterward, the same way GitHub or Stripe never
+show a generated secret a second time. `indexnow.key` and
+`search_console.client_id` are deliberately not on that list: the first is
+published on purpose at `/{key}.txt`, the second routinely visible in a
+browser's own OAuth redirect URL — neither is actually secret.
+
 ### Fixed — three singletons that went stale under Octane and long-running queue workers
 
 Auditing every singleton this package registers found three that cache
