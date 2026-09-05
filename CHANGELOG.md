@@ -11,6 +11,46 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Added — an AI tool registry, phase one (read-only)
+
+The AI subsystem (`AiManager::suggestMeta()`/`suggestKeywords()`) has always
+been reachable only by writing PHP against `Seo::ai()` directly — no route,
+no console command, nothing an external agent could discover. This starts a
+deeper integration: every capability of this package described as a
+discrete, schema'd `Contracts\AiTool` an AI agent can enumerate and call,
+without the package author hand-writing glue for whatever LLM SDK or agent
+framework a host application happens to use.
+
+- **`Ai\Tools\AiToolRegistry`** discovers tools from `seo.ai.tools.enabled`
+  the same way `seo.analysis.checks` discovers content-analysis checks, and
+  builds a manifest (name, description, JSON Schema input, risk tier) —
+  filtered to only what the caller is actually authorized for, so a tool a
+  caller cannot use is left off entirely rather than listed and refused.
+- **Three risk tiers**, each behind its own Gate ability: `Read`
+  (`viewSeoPanel`, same Gate as the rest of the API/panel), `Write`
+  (`useSeoAiWrites`), `Destructive` (`useSeoAiDestructive`) — both new,
+  deny-by-default like `viewSeoPanel` always has been. An application can
+  let an agent read everything without also handing it delete.
+- **`Ai\Tools\AiToolDispatcher`**: a `Read` tool runs immediately; a `Write`
+  or `Destructive` tool requires two calls — the first returns a proposal id
+  and a preview with nothing mutated, the second must name that proposal id
+  to actually execute, replaying the input captured at propose time rather
+  than trusting whatever the confirming call sends. Every propose and apply
+  is logged to a new `seo_ai_tool_calls` table, independent of `seo_ai_log`
+  (LLM token/cost accounting, unrelated to whether a tool call mutated
+  anything).
+- **Seven tools**, all `Read`-tier for now — thin wrappers with no logic of
+  their own, calling the exact same services their REST/panel twins do:
+  `seo.meta.get`, `seo.redirects.list`, `seo.not_found.list`,
+  `seo.dashboard.summary`, `seo.audit.history`, `seo.internal_links.list`,
+  `seo.settings.get` (same secret-masking as the dynamic settings API — a
+  raw OAuth credential is never handed to an AI caller any more than a
+  human one).
+
+No REST or MCP endpoint yet — this phase proves the propose/manifest
+plumbing against zero-risk tools before any mutation is reachable through
+it. Write/Destructive tools, and the protocol surface itself, land next.
+
 ### Fixed — five robustness gaps found by an edge-case audit
 
 - **Dynamic settings never validated the *value* being written**, only that

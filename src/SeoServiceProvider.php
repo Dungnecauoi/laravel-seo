@@ -76,6 +76,8 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(SchemaValidator::class);
         $this->app->singleton(Redirects\RedirectGuard::class);
         $this->app->singleton(Canonical\CanonicalGuard::class);
+        $this->app->singleton(Ai\Tools\AiToolRegistry::class);
+        $this->app->singleton(Ai\Tools\AiToolDispatcher::class);
         $this->app->singleton(NotFound\NotFoundLogger::class);
         $this->app->singleton(Robots\RobotsTxt::class);
         $this->app->singleton(Ai\AiBudget::class);
@@ -470,11 +472,25 @@ final class SeoServiceProvider extends ServiceProvider
      * An SEO panel can rewrite every title on a site and redirect any URL, so
      * forgetting to define this Gate must lock the door rather than open it.
      * The application overrides it with its own definition.
+     *
+     * 'useSeoAiWrites' and 'useSeoAiDestructive' guard the two riskier AI
+     * tool tiers on top of 'viewSeoPanel' — an application can let an agent
+     * read everything through 'viewSeoPanel' without also handing it
+     * Destructive tools like pruning the 404 log, by defining only the first
+     * two. All three deny by default for the same reason the first one does.
      */
     private function registerGate(): void
     {
         if (! Gate::has('viewSeoPanel')) {
             Gate::define('viewSeoPanel', static fn (mixed $user = null): bool => false);
+        }
+
+        if (! Gate::has('useSeoAiWrites')) {
+            Gate::define('useSeoAiWrites', static fn (mixed $user = null): bool => false);
+        }
+
+        if (! Gate::has('useSeoAiDestructive')) {
+            Gate::define('useSeoAiDestructive', static fn (mixed $user = null): bool => false);
         }
     }
 

@@ -530,6 +530,31 @@ for a Vietnamese description reliably produces stilted Vietnamese. Results are
 cached by content hash, every call is logged with its tokens, and a daily token
 budget caps what a runaway loop can spend.
 
+**AI tool registry** — every capability of this package described well
+enough for an AI agent to discover and call, without hand-written glue for
+whatever LLM SDK or agent framework a host application uses:
+
+```php
+app(AiToolRegistry::class)->manifest($context); // name, description, JSON Schema, risk tier — only what $context is authorized for
+app(AiToolDispatcher::class)->call('seo.dashboard.summary', [], $context);
+```
+
+Each tool is a `Contracts\AiTool` doing nothing but call an existing service
+— `Seo`, `RedirectRepository`, `SettingsRepository` — so a tool can never
+grant an AI caller a capability a human doesn't already have through the API
+or the panel. Three risk tiers, each behind its own Gate: `Read` runs
+immediately (`viewSeoPanel`, the same Gate as the rest of the API); `Write`
+and `Destructive` (`useSeoAiWrites`/`useSeoAiDestructive`, both deny by
+default) require a propose-then-confirm round trip — the first call returns
+a proposal id and a preview with nothing mutated, the second must name that
+id to actually run, replaying the input captured at propose time rather than
+whatever the confirming call sends. Every propose and apply is logged to
+`seo_ai_tool_calls`. Currently seven read-only tools
+(`seo.meta.get`, `seo.redirects.list`, `seo.not_found.list`,
+`seo.dashboard.summary`, `seo.audit.history`, `seo.internal_links.list`,
+`seo.settings.get`); write/destructive tools and a REST/MCP surface for
+external agents are next.
+
 ### The npm client
 
 [`@duxbo/seo-core`](js/packages/core/) holds the types, the API client, and the

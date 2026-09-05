@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+use Duxbo\Seo\Ai\Tools\Audit\AuditHistoryTool;
+use Duxbo\Seo\Ai\Tools\Dashboard\DashboardSummaryTool;
+use Duxbo\Seo\Ai\Tools\InternalLinks\ListInternalLinksTool;
+use Duxbo\Seo\Ai\Tools\Meta\GetMetaTool;
+use Duxbo\Seo\Ai\Tools\NotFound\ListNotFoundTool;
+use Duxbo\Seo\Ai\Tools\Redirects\ListRedirectsTool;
+use Duxbo\Seo\Ai\Tools\Settings\GetSettingsTool;
 use Duxbo\Seo\Resolution\Stages\GlobalDefaultStage;
 use Duxbo\Seo\Resolution\Stages\ModelAttributeStage;
 use Duxbo\Seo\Resolution\Stages\SanitizeStage;
@@ -708,6 +715,38 @@ return [
             'models' => [
                 // 'claude-sonnet-5' => ['input' => 3.00, 'output' => 15.00],
             ],
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | AI tools
+        |----------------------------------------------------------------------
+        |
+        | Every capability of this package exposed as a discrete, schema'd
+        | action an AI agent can enumerate and call — see AiToolRegistry and
+        | AiToolDispatcher. A Read tool here runs immediately; Write and
+        | Destructive tools go through a propose-then-confirm round trip
+        | first, gated behind 'useSeoAiWrites' / 'useSeoAiDestructive' rather
+        | than the panel's own 'viewSeoPanel', so an application can expose
+        | read access to an agent without also handing it delete.
+        |
+        */
+        'tools' => [
+            'enabled' => [
+                GetMetaTool::class,
+                ListRedirectsTool::class,
+                ListNotFoundTool::class,
+                DashboardSummaryTool::class,
+                AuditHistoryTool::class,
+                ListInternalLinksTool::class,
+                GetSettingsTool::class,
+            ],
+
+            // Seconds a Write/Destructive tool's proposal stays confirmable.
+            'proposal_ttl' => 900,
+
+            'log' => true,
+            'table' => 'seo_ai_tool_calls',
         ],
     ],
 
