@@ -549,11 +549,13 @@ default) require a propose-then-confirm round trip — the first call returns
 a proposal id and a preview with nothing mutated, the second must name that
 id to actually run, replaying the input captured at propose time rather than
 whatever the confirming call sends. Every propose and apply is logged to
-`seo_ai_tool_calls`. Currently seven read-only tools
+`seo_ai_tool_calls`. Seven read-only tools
 (`seo.meta.get`, `seo.redirects.list`, `seo.not_found.list`,
 `seo.dashboard.summary`, `seo.audit.history`, `seo.internal_links.list`,
-`seo.settings.get`); write/destructive tools and a REST/MCP surface for
-external agents are next.
+`seo.settings.get`) plus eight that write or delete
+(`seo.redirects.create`/`.toggle`/`.delete`,
+`seo.not_found.prune`/`.convert_to_redirect`, `seo.settings.set`/`.clear`,
+`seo.indexnow.submit`) — a REST/MCP surface for external agents is next.
 
 ### The npm client
 

@@ -12,6 +12,8 @@ use Duxbo\Seo\Enums\AiToolResultStatus;
 use Duxbo\Seo\Exceptions\AiToolNotFound;
 use Duxbo\Seo\Exceptions\AiToolProposalExpired;
 use Duxbo\Seo\Exceptions\AiToolUnauthorized;
+use Duxbo\Seo\Exceptions\InvalidSettingValue;
+use Duxbo\Seo\Exceptions\UnsafeRedirect;
 use Duxbo\Seo\Facades\Seo;
 use Duxbo\Seo\Redirects\RedirectRepository;
 use Duxbo\Seo\Settings\SettingsRepository;
@@ -19,10 +21,12 @@ use Duxbo\Seo\Tests\Fixtures\FakeDestructiveTool;
 use Duxbo\Seo\Tests\Fixtures\FakeWriteTool;
 use Duxbo\Seo\Tests\Fixtures\Post;
 use Duxbo\Seo\Tests\TestCase;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
 
 final class AiToolsTest extends TestCase
 {
@@ -41,6 +45,8 @@ final class AiToolsTest extends TestCase
 
         Relation::enforceMorphMap(['post' => Post::class]);
         Gate::define('viewSeoPanel', static fn (mixed $user = null): bool => true);
+        Gate::define('useSeoAiWrites', static fn (mixed $user = null): bool => true);
+        Gate::define('useSeoAiDestructive', static fn (mixed $user = null): bool => true);
 
         FakeWriteTool::reset();
         FakeDestructiveTool::reset();
@@ -247,6 +253,173 @@ final class AiToolsTest extends TestCase
         $this->assertTrue($entry['secret']);
         $this->assertTrue($entry['is_set']);
         $this->assertArrayNotHasKey('value', $entry);
+    }
+
+    public function test_create_redirect_tool_proposes_then_creates(): void
+    {
+        $context = new AiToolContext();
+
+        $proposed = $this->dispatcher()->call('seo.redirects.create', [
+            'source' => '/cu', 'target' => '/moi',
+        ], $context);
+
+        $this->assertSame(AiToolResultStatus::Proposed, $proposed->status);
+        $this->assertStringContainsString('301', (string) $proposed->preview);
+        $this->assertDatabaseMissing('seo_redirects', ['source_path' => '/cu']);
+
+        $applied = $this->dispatcher()->call('seo.redirects.create', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertSame(AiToolResultStatus::Applied, $applied->status);
+        $this->assertDatabaseHas('seo_redirects', ['source_path' => '/cu', 'target' => '/moi']);
+    }
+
+    public function test_create_redirect_tool_refuses_an_unsafe_target_on_the_propose_call(): void
+    {
+        $this->expectException(UnsafeRedirect::class);
+
+        // Fails on the very first (propose) call — no proposal is ever
+        // created for a rule that was always going to be refused.
+        $this->dispatcher()->call('seo.redirects.create', [
+            'source' => '/khuyen-mai', 'target' => 'https://trang-lua-dao.com',
+        ], new AiToolContext());
+
+        $this->assertSame(0, DB::table('seo_ai_tool_calls')->count());
+    }
+
+    public function test_toggle_redirect_tool_disables_an_active_rule(): void
+    {
+        $redirect = app(RedirectRepository::class)->create('/cu', '/moi');
+        $context = new AiToolContext();
+
+        $proposed = $this->dispatcher()->call('seo.redirects.toggle', [
+            'id' => $redirect->getKey(), 'active' => false,
+        ], $context);
+
+        $this->dispatcher()->call('seo.redirects.toggle', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertDatabaseHas('seo_redirects', ['id' => $redirect->getKey(), 'is_active' => false]);
+    }
+
+    public function test_toggle_redirect_tool_refuses_an_unknown_id_immediately(): void
+    {
+        $this->expectException(ModelNotFoundException::class);
+
+        $this->dispatcher()->call('seo.redirects.toggle', ['id' => 999, 'active' => true], new AiToolContext());
+    }
+
+    public function test_delete_redirect_tool_removes_the_row_only_after_confirming(): void
+    {
+        $redirect = app(RedirectRepository::class)->create('/cu', '/moi');
+        $context = new AiToolContext();
+
+        $proposed = $this->dispatcher()->call('seo.redirects.delete', ['id' => $redirect->getKey()], $context);
+        $this->assertDatabaseHas('seo_redirects', ['id' => $redirect->getKey()]);
+
+        $this->dispatcher()->call('seo.redirects.delete', [], $context, confirm: $proposed->proposalId);
+        $this->assertDatabaseMissing('seo_redirects', ['id' => $redirect->getKey()]);
+    }
+
+    public function test_prune_not_found_tool_preview_counts_exactly_what_it_will_delete(): void
+    {
+        DB::table('seo_not_found')->insert([
+            ['path' => '/cu', 'path_hash' => md5('/cu'), 'hits' => 1, 'first_seen_at' => now()->subDays(200), 'last_seen_at' => now()->subDays(200)],
+            ['path' => '/moi', 'path_hash' => md5('/moi'), 'hits' => 1, 'first_seen_at' => now(), 'last_seen_at' => now()],
+        ]);
+
+        $context = new AiToolContext();
+        $proposed = $this->dispatcher()->call('seo.not_found.prune', ['days' => 90], $context);
+
+        $this->assertStringContainsString('1 404 log entry', (string) $proposed->preview);
+
+        $applied = $this->dispatcher()->call('seo.not_found.prune', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertSame(1, $applied->data['deleted']);
+        $this->assertDatabaseMissing('seo_not_found', ['path' => '/cu']);
+        $this->assertDatabaseHas('seo_not_found', ['path' => '/moi']);
+    }
+
+    public function test_convert_not_found_to_redirect_tool_creates_a_redirect_and_clears_the_log(): void
+    {
+        DB::table('seo_not_found')->insert([
+            'id' => 1, 'path' => '/duong-dan-cu', 'path_hash' => md5('/duong-dan-cu'),
+            'hits' => 5, 'first_seen_at' => now(), 'last_seen_at' => now(),
+        ]);
+
+        $context = new AiToolContext();
+        $proposed = $this->dispatcher()->call('seo.not_found.convert_to_redirect', [
+            'id' => 1, 'target' => '/duong-dan-moi',
+        ], $context);
+
+        $this->dispatcher()->call('seo.not_found.convert_to_redirect', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertDatabaseHas('seo_redirects', ['source_path' => '/duong-dan-cu', 'target' => '/duong-dan-moi']);
+        $this->assertDatabaseMissing('seo_not_found', ['id' => 1]);
+    }
+
+    public function test_set_setting_tool_writes_a_valid_value_after_confirming(): void
+    {
+        config(['seo.settings.enabled' => true]);
+        $context = new AiToolContext();
+
+        $proposed = $this->dispatcher()->call('seo.settings.set', [
+            'key' => 'verification.google', 'value' => 'abc123',
+        ], $context);
+
+        $this->assertNull(config('seo.verification.google'));
+
+        $this->dispatcher()->call('seo.settings.set', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertSame('abc123', config('seo.verification.google'));
+    }
+
+    public function test_set_setting_tool_refuses_an_invalid_value_on_the_propose_call(): void
+    {
+        config(['seo.settings.enabled' => true]);
+
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->dispatcher()->call('seo.settings.set', [
+            'key' => 'robots.block_ai_crawlers', 'value' => 'not-a-boolean',
+        ], new AiToolContext());
+    }
+
+    public function test_set_setting_tool_never_echoes_a_secret_value_in_the_preview(): void
+    {
+        config(['seo.settings.enabled' => true]);
+
+        $proposed = $this->dispatcher()->call('seo.settings.set', [
+            'key' => 'search_console.refresh_token', 'value' => 'super-secret-token',
+        ], new AiToolContext());
+
+        $this->assertStringNotContainsString('super-secret-token', (string) $proposed->preview);
+    }
+
+    public function test_clear_setting_tool_removes_a_stored_override(): void
+    {
+        config(['seo.settings.enabled' => true]);
+        app(SettingsRepository::class)->set('verification.google', 'abc123');
+
+        $context = new AiToolContext();
+        $proposed = $this->dispatcher()->call('seo.settings.clear', ['key' => 'verification.google'], $context);
+        $this->dispatcher()->call('seo.settings.clear', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertFalse(app(SettingsRepository::class)->has('verification.google'));
+    }
+
+    public function test_submit_urls_tool_posts_to_indexnow_only_after_confirming(): void
+    {
+        config(['seo.indexnow.enabled' => true, 'seo.indexnow.key' => 'test-key-123']);
+        Http::fake(['api.indexnow.org/*' => Http::response('', 200)]);
+
+        $context = new AiToolContext();
+        $proposed = $this->dispatcher()->call('seo.indexnow.submit', ['urls' => ['/bai-viet-1']], $context);
+
+        Http::assertNothingSent();
+
+        $applied = $this->dispatcher()->call('seo.indexnow.submit', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertTrue($applied->data['submitted']);
+        Http::assertSentCount(1);
     }
 
     private function registerFakeTools(): void

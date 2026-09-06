@@ -11,6 +11,31 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Added — write and destructive AI tools
+
+Eight more tools on top of last phase's seven read-only ones, exercising the
+propose/confirm cycle for real: `seo.redirects.create`, `.toggle`, `.delete`;
+`seo.not_found.prune`, `.convert_to_redirect`; `seo.settings.set`, `.clear`;
+`seo.indexnow.submit`. Every one is a thin wrapper over the same repository
+its REST/panel twin already uses (`RedirectRepository`, `SettingsRepository`,
+`NotFoundLogger`, `IndexNowSubmitter`) — none of them open a capability that
+wasn't already reachable through the existing API or panel, they only make
+it AI-callable.
+
+Where it's cheap to know in advance, `preview()` runs the real check instead
+of a generic description, so an obviously-bad call fails on the *propose*
+step rather than wasting a confirm round trip: `CreateRedirectTool` and
+`ConvertNotFoundToRedirectTool` run the same `RedirectGuard` pattern/target/
+loop checks `RedirectRepository::create()` would; `SetSettingTool` runs
+`SettingsRepository::assertValid()`; a secret setting's value is never
+echoed into the preview text. `SubmitUrlsTool` is the deliberate exception —
+its preview only describes the call, since actually validating it would mean
+making the very outbound IndexNow request the propose/confirm split exists
+to gate. `ToggleRedirectTool` takes an explicit desired `active` state
+rather than "flip whatever it currently is," and re-enabling a rule that
+would now form a loop is refused by `Redirect`'s own `saving` guard at
+execute() time, the same as any other write to that model.
+
 ### Added — an AI tool registry, phase one (read-only)
 
 The AI subsystem (`AiManager::suggestMeta()`/`suggestKeywords()`) has always

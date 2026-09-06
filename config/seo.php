@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 use Duxbo\Seo\Ai\Tools\Audit\AuditHistoryTool;
 use Duxbo\Seo\Ai\Tools\Dashboard\DashboardSummaryTool;
+use Duxbo\Seo\Ai\Tools\IndexNow\SubmitUrlsTool;
 use Duxbo\Seo\Ai\Tools\InternalLinks\ListInternalLinksTool;
 use Duxbo\Seo\Ai\Tools\Meta\GetMetaTool;
+use Duxbo\Seo\Ai\Tools\NotFound\ConvertNotFoundToRedirectTool;
 use Duxbo\Seo\Ai\Tools\NotFound\ListNotFoundTool;
+use Duxbo\Seo\Ai\Tools\NotFound\PruneNotFoundTool;
+use Duxbo\Seo\Ai\Tools\Redirects\CreateRedirectTool;
+use Duxbo\Seo\Ai\Tools\Redirects\DeleteRedirectTool;
 use Duxbo\Seo\Ai\Tools\Redirects\ListRedirectsTool;
+use Duxbo\Seo\Ai\Tools\Redirects\ToggleRedirectTool;
+use Duxbo\Seo\Ai\Tools\Settings\ClearSettingTool;
 use Duxbo\Seo\Ai\Tools\Settings\GetSettingsTool;
+use Duxbo\Seo\Ai\Tools\Settings\SetSettingTool;
 use Duxbo\Seo\Resolution\Stages\GlobalDefaultStage;
 use Duxbo\Seo\Resolution\Stages\ModelAttributeStage;
 use Duxbo\Seo\Resolution\Stages\SanitizeStage;
@@ -733,6 +741,7 @@ return [
         */
         'tools' => [
             'enabled' => [
+                // Read
                 GetMetaTool::class,
                 ListRedirectsTool::class,
                 ListNotFoundTool::class,
@@ -740,6 +749,18 @@ return [
                 AuditHistoryTool::class,
                 ListInternalLinksTool::class,
                 GetSettingsTool::class,
+
+                // Write
+                CreateRedirectTool::class,
+                ToggleRedirectTool::class,
+                ConvertNotFoundToRedirectTool::class,
+                SetSettingTool::class,
+
+                // Destructive
+                DeleteRedirectTool::class,
+                PruneNotFoundTool::class,
+                ClearSettingTool::class,
+                SubmitUrlsTool::class,
             ],
 
             // Seconds a Write/Destructive tool's proposal stays confirmable.
