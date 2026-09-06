@@ -2,14 +2,20 @@
 
 declare(strict_types=1);
 
+use Duxbo\Seo\Ai\Tools\Analysis\SuggestContentFixesTool;
 use Duxbo\Seo\Ai\Tools\Audit\AuditHistoryTool;
 use Duxbo\Seo\Ai\Tools\Dashboard\DashboardSummaryTool;
 use Duxbo\Seo\Ai\Tools\IndexNow\SubmitUrlsTool;
 use Duxbo\Seo\Ai\Tools\InternalLinks\ListInternalLinksTool;
+use Duxbo\Seo\Ai\Tools\InternalLinks\SuggestInternalLinkFixesTool;
+use Duxbo\Seo\Ai\Tools\Meta\ApplyMetaTool;
+use Duxbo\Seo\Ai\Tools\Meta\DeleteMetaTool;
 use Duxbo\Seo\Ai\Tools\Meta\GetMetaTool;
+use Duxbo\Seo\Ai\Tools\Meta\SuggestMetaTool;
 use Duxbo\Seo\Ai\Tools\NotFound\ConvertNotFoundToRedirectTool;
 use Duxbo\Seo\Ai\Tools\NotFound\ListNotFoundTool;
 use Duxbo\Seo\Ai\Tools\NotFound\PruneNotFoundTool;
+use Duxbo\Seo\Ai\Tools\NotFound\SuggestRedirectTargetTool;
 use Duxbo\Seo\Ai\Tools\Redirects\CreateRedirectTool;
 use Duxbo\Seo\Ai\Tools\Redirects\DeleteRedirectTool;
 use Duxbo\Seo\Ai\Tools\Redirects\ListRedirectsTool;
@@ -716,6 +722,23 @@ return [
         // Markup is noise the model pays for by the token.
         'content_characters' => 4000,
 
+        // A second, separate cap for the *fixed* context a grounded prompt
+        // adds on top of the content above — the current stored title/
+        // description, the site name, real audit findings. Kept apart from
+        // content_characters so adding a new context source never silently
+        // grows the effective prompt budget without a number to point at.
+        'context_characters' => 1000,
+
+        // After this many consecutive failures, a driver stops being tried
+        // at all for a while — a loop over a few thousand records must not
+        // retry a provider that is already down once per record. Independent
+        // of daily_token_budget, which caps spend, not failure storms.
+        'circuit_breaker' => [
+            'enabled' => true,
+            'threshold' => 5,
+            'cooldown_seconds' => 60,
+        ],
+
         // Published prices change; a hard-coded rate would make the cost column
         // quietly wrong. Rates are per million tokens.
         'pricing' => [
@@ -749,18 +772,24 @@ return [
                 AuditHistoryTool::class,
                 ListInternalLinksTool::class,
                 GetSettingsTool::class,
+                SuggestMetaTool::class,
+                SuggestContentFixesTool::class,
+                SuggestRedirectTargetTool::class,
+                SuggestInternalLinkFixesTool::class,
 
                 // Write
                 CreateRedirectTool::class,
                 ToggleRedirectTool::class,
                 ConvertNotFoundToRedirectTool::class,
                 SetSettingTool::class,
+                ApplyMetaTool::class,
 
                 // Destructive
                 DeleteRedirectTool::class,
                 PruneNotFoundTool::class,
                 ClearSettingTool::class,
                 SubmitUrlsTool::class,
+                DeleteMetaTool::class,
             ],
 
             // Seconds a Write/Destructive tool's proposal stays confirmable.

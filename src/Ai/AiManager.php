@@ -15,6 +15,8 @@ use Duxbo\Seo\Contracts\AiDriver;
 use Duxbo\Seo\Contracts\ResetsBetweenRequests;
 use Duxbo\Seo\Data\AiRequest;
 use Duxbo\Seo\Data\AiResponse;
+use Duxbo\Seo\Data\CheckResult;
+use Duxbo\Seo\Data\SeoData;
 use Duxbo\Seo\Events\AiRequestSent;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Config\Repository as Config;
@@ -54,6 +56,7 @@ final class AiManager implements ResetsBetweenRequests
         private readonly Dispatcher $events,
         private readonly AiBudget $budget,
         private readonly PromptLibrary $prompts,
+        private readonly AiCircuitBreaker $breaker,
     ) {
     }
 
@@ -109,15 +112,18 @@ final class AiManager implements ResetsBetweenRequests
         $this->budget->assertWithinBudget();
 
         $instance = $this->driver($driver);
+        $this->breaker->assertClosed($instance->name());
 
         try {
             $response = $instance->complete($request);
         } catch (\Throwable $e) {
             $this->budget->recordFailure($instance->name(), $e->getMessage(), $purpose);
+            $this->breaker->recordFailure($instance->name());
 
             throw $e;
         }
 
+        $this->breaker->recordSuccess($instance->name());
         $this->budget->record($response, $purpose);
         $this->events->dispatch(new AiRequestSent($request, $response, $purpose));
         $this->remember($request, $response);
@@ -128,16 +134,97 @@ final class AiManager implements ResetsBetweenRequests
     /**
      * Suggest a title and description for a piece of content.
      *
+     * `$current` and `$siteBrand` are optional grounding context — passing
+     * them does not change the output shape, only how well-informed the
+     * suggestion is.
+     *
      * @return array{title?: string, description?: string}
      */
-    public function suggestMeta(string $content, ?string $keyword = null, ?string $locale = null): array
-    {
+    public function suggestMeta(
+        string $content,
+        ?string $keyword = null,
+        ?string $locale = null,
+        ?SeoData $current = null,
+        ?string $siteBrand = null,
+    ): array {
         $response = $this->complete(
-            $this->prompts->meta($content, $keyword, $locale),
+            $this->prompts->meta($content, $keyword, $locale, $current, $siteBrand),
             purpose: 'meta',
         );
 
         /** @var array{title?: string, description?: string} $result */
+        $result = $response->content;
+
+        return $result;
+    }
+
+    /**
+     * Suggest a title and description that specifically address real
+     * content-analysis findings, rather than writing generic meta from
+     * scratch — the same shape as {@see suggestMeta()}, grounded differently.
+     *
+     * @param  list<CheckResult>  $findings  Typically {@see \Duxbo\Seo\Data\AnalysisReport::problems()}.
+     * @return array{title?: string, description?: string}
+     */
+    public function suggestContentFixes(
+        string $content,
+        array $findings,
+        ?SeoData $current = null,
+        ?string $keyword = null,
+        ?string $siteBrand = null,
+        ?string $locale = null,
+    ): array {
+        $response = $this->complete(
+            $this->prompts->contentFix($content, $findings, $current, $keyword, $siteBrand, $locale),
+            purpose: 'content_fix',
+        );
+
+        /** @var array{title?: string, description?: string} $result */
+        $result = $response->content;
+
+        return $result;
+    }
+
+    /**
+     * Suggest which of a shortlist of *real* URLs on this site should
+     * replace a 404'd path — the caller builds the shortlist (e.g. from
+     * existing titles/slugs), so the model picks among real candidates
+     * instead of inventing one; the schema also constrains the answer to
+     * exactly one of them.
+     *
+     * @param  list<array{url: string, title: string|null}>  $candidates  Must be non-empty.
+     * @return array{targetUrl?: string, reasoning?: string}
+     */
+    public function suggestRedirectTarget(string $path, array $candidates, ?string $locale = null): array
+    {
+        $response = $this->complete(
+            $this->prompts->redirectTarget($path, $candidates, $locale),
+            purpose: 'redirect_target',
+        );
+
+        /** @var array{targetUrl?: string, reasoning?: string} $result */
+        $result = $response->content;
+
+        return $result;
+    }
+
+    /**
+     * Suggest which of a set of topically-related pages should link to an
+     * orphaned one, and with what anchor text. Propose-only: this package
+     * has no write path into a model's own body content, so nothing can
+     * apply this automatically the way a redirect or a meta suggestion can.
+     *
+     * @param  list<array{url: string, title: string|null}>  $candidateSources  Must be non-empty.
+     * @return array{suggestions?: list<array{sourceUrl: string, anchorText: string}>}
+     */
+    public function suggestInternalLinkFixes(string $orphanUrl, string $orphanTitle, array $candidateSources, ?string $locale = null): array
+    {
+        $response = $this->complete(
+            $this->prompts->internalLinkFix($orphanUrl, $orphanTitle, $candidateSources, $locale),
+            purpose: 'internal_link',
+        );
+
+        /** @var array{suggestions?: list<array{sourceUrl: string, anchorText: string}>} $result */
         $result = $response->content;
 
         return $result;

@@ -527,8 +527,22 @@ instance) the same way, or a genuinely different API shape entirely.
 
 Prompts are translated, not just their output: an English instruction asking
 for a Vietnamese description reliably produces stilted Vietnamese. Results are
-cached by content hash, every call is logged with its tokens, and a daily token
-budget caps what a runaway loop can spend.
+cached by content hash, every call is logged with its tokens, a daily token
+budget caps what a runaway loop can spend, and a circuit breaker stops
+retrying a driver that has failed `circuit_breaker.threshold` times in a row
+(default 5) for `cooldown_seconds` (default 60) — independent concerns:
+one caps spend, the other stops a loop from hammering a provider that is
+already down.
+
+`suggestMeta()` can be grounded in what is already stored (`current`) and
+the site's own name (`siteBrand`) — an optional improvement, not a required
+one. Two further methods are grounded by design, not by option:
+`suggestContentFixes()` names the exact `AnalysisReport::problems()`
+findings in the prompt instead of writing generic meta, and
+`suggestRedirectTarget()`/`suggestInternalLinkFixes()` take a shortlist of
+*real* candidate URLs and constrain the answer's JSON Schema to an `enum` of
+exactly those — the model cannot hallucinate a URL no matter what the prompt
+alone asks for, because the schema itself won't accept one.
 
 **AI tool registry** — every capability of this package described well
 enough for an AI agent to discover and call, without hand-written glue for
@@ -549,11 +563,14 @@ default) require a propose-then-confirm round trip — the first call returns
 a proposal id and a preview with nothing mutated, the second must name that
 id to actually run, replaying the input captured at propose time rather than
 whatever the confirming call sends. Every propose and apply is logged to
-`seo_ai_tool_calls`. Seven read-only tools
+`seo_ai_tool_calls`. Eleven read-only tools — the seven plain reads
 (`seo.meta.get`, `seo.redirects.list`, `seo.not_found.list`,
 `seo.dashboard.summary`, `seo.audit.history`, `seo.internal_links.list`,
-`seo.settings.get`) plus eight that write or delete
-(`seo.redirects.create`/`.toggle`/`.delete`,
+`seo.settings.get`) plus four AI suggestions grounded in real data
+(`seo.meta.suggest`, `seo.analysis.suggest_fixes`,
+`seo.not_found.suggest_redirect_target`, `seo.internal_links.suggest_fixes`)
+— plus ten that write or delete (`seo.meta.apply`/`.delete`,
+`seo.redirects.create`/`.toggle`/`.delete`,
 `seo.not_found.prune`/`.convert_to_redirect`, `seo.settings.set`/`.clear`,
 `seo.indexnow.submit`).
 

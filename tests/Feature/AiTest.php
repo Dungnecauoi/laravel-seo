@@ -9,6 +9,8 @@ use Duxbo\Seo\Ai\Drivers\NullDriver;
 use Duxbo\Seo\Contracts\AiDriver;
 use Duxbo\Seo\Data\AiRequest;
 use Duxbo\Seo\Data\AiResponse;
+use Duxbo\Seo\Data\CheckResult;
+use Duxbo\Seo\Data\SeoData;
 use Duxbo\Seo\Exceptions\AiRequestFailed;
 use Duxbo\Seo\Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -394,6 +396,145 @@ final class AiTest extends TestCase
 
             // Markup is noise the model pays for by the token.
             $this->assertStringNotContainsString('<p>', $body['messages'][0]['content']);
+
+            return true;
+        });
+    }
+
+    public function test_suggest_meta_without_grounding_produces_the_same_prompt_as_before(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => ['title' => 'x', 'description' => 'y']]],
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])]);
+        config(['seo.ai.default' => 'claude']);
+
+        $this->ai()->suggestMeta('<p>Nội dung</p>', 'tối ưu SEO', 'vi');
+
+        Http::assertSent(function ($request): bool {
+            $prompt = $request->data()['messages'][0]['content'];
+
+            // No current/siteBrand/findings passed — the prompt must not
+            // grow an empty "Additional context:" section.
+            $this->assertStringNotContainsString('Bối cảnh bổ sung', $prompt);
+
+            return true;
+        });
+    }
+
+    public function test_suggest_meta_grounds_the_prompt_in_the_current_metadata_and_site_brand(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => ['title' => 'x', 'description' => 'y']]],
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])]);
+        config(['seo.ai.default' => 'claude']);
+
+        $this->ai()->suggestMeta(
+            '<p>Nội dung</p>',
+            'tối ưu SEO',
+            'vi',
+            current: new SeoData(title: 'Tiêu đề cũ', description: 'Mô tả cũ'),
+            siteBrand: 'Trang Của Tôi',
+        );
+
+        Http::assertSent(function ($request): bool {
+            $prompt = $request->data()['messages'][0]['content'];
+
+            $this->assertStringContainsString('Bối cảnh bổ sung', $prompt);
+            $this->assertStringContainsString('Trang Của Tôi', $prompt);
+            $this->assertStringContainsString('Tiêu đề cũ', $prompt);
+            $this->assertStringContainsString('Mô tả cũ', $prompt);
+
+            return true;
+        });
+    }
+
+    public function test_suggest_content_fixes_grounds_the_prompt_in_real_translated_findings(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => ['title' => 'x', 'description' => 'y']]],
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])]);
+        config(['seo.ai.default' => 'claude']);
+
+        $finding = CheckResult::warning(
+            'content-length',
+            'seo::analysis.content_length.short',
+            'seo::analysis.content_length.hint',
+            ['count' => 120, 'minimum' => 600],
+        );
+
+        $this->ai()->suggestContentFixes('<p>Nội dung</p>', [$finding], keyword: 'tối ưu SEO', locale: 'vi');
+
+        Http::assertSent(function ($request): bool {
+            $prompt = $request->data()['messages'][0]['content'];
+
+            // The raw translation key must never leak into the prompt —
+            // only its rendered, human-readable form.
+            $this->assertStringNotContainsString('seo::analysis.content_length.short', $prompt);
+            $this->assertStringContainsString('120', $prompt);
+
+            return true;
+        });
+    }
+
+    public function test_suggest_redirect_target_constrains_the_answer_to_the_real_candidates(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => ['targetUrl' => '/bai-moi', 'reasoning' => 'Khớp nhất']]],
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])]);
+        config(['seo.ai.default' => 'claude']);
+
+        $result = $this->ai()->suggestRedirectTarget('/bai-cu', [
+            ['url' => '/bai-moi', 'title' => 'Bài viết mới'],
+            ['url' => '/khac', 'title' => null],
+        ]);
+
+        $this->assertSame('/bai-moi', $result['targetUrl']);
+
+        Http::assertSent(function ($request): bool {
+            $schema = $request->data()['tools'][0]['input_schema'];
+
+            $this->assertSame(['/bai-moi', '/khac'], $schema['properties']['targetUrl']['enum']);
+
+            $prompt = $request->data()['messages'][0]['content'];
+            $this->assertStringContainsString('/bai-moi', $prompt);
+            $this->assertStringContainsString('Bài viết mới', $prompt);
+
+            return true;
+        });
+    }
+
+    public function test_suggest_internal_link_fixes_constrains_source_urls_to_the_real_candidates(): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => ['suggestions' => [
+                ['sourceUrl' => '/lien-quan', 'anchorText' => 'bài viết liên quan'],
+            ]]]],
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])]);
+        config(['seo.ai.default' => 'claude']);
+
+        $result = $this->ai()->suggestInternalLinkFixes('/mo-coi', 'Bài mồ côi', [
+            ['url' => '/lien-quan', 'title' => 'Bài liên quan'],
+        ]);
+
+        $this->assertSame('/lien-quan', $result['suggestions'][0]['sourceUrl']);
+
+        Http::assertSent(function ($request): bool {
+            $schema = $request->data()['tools'][0]['input_schema'];
+
+            $this->assertSame(
+                ['/lien-quan'],
+                $schema['properties']['suggestions']['items']['properties']['sourceUrl']['enum'],
+            );
 
             return true;
         });

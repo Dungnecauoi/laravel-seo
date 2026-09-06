@@ -82,6 +82,7 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(NotFound\NotFoundLogger::class);
         $this->app->singleton(Robots\RobotsTxt::class);
         $this->app->singleton(Ai\AiBudget::class);
+        $this->app->singleton(Ai\AiCircuitBreaker::class);
         $this->app->singleton(Ai\PromptLibrary::class);
         $this->app->singleton(Ai\AiManager::class);
         $this->app->singleton(SiteIndexability::class);
@@ -220,6 +221,7 @@ final class SeoServiceProvider extends ServiceProvider
         return [
             RedirectMatcher::class,
             Ai\AiManager::class,
+            Ai\AiCircuitBreaker::class,
             Settings\SettingsRepository::class,
         ];
     }

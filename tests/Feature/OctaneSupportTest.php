@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Tests\Feature;
 
+use Duxbo\Seo\Ai\AiCircuitBreaker;
 use Duxbo\Seo\Ai\AiManager;
 use Duxbo\Seo\Contracts\RedirectMatcher;
+use Duxbo\Seo\Exceptions\AiCircuitOpen;
 use Duxbo\Seo\Redirects\Redirect;
 use Duxbo\Seo\Redirects\RedirectRepository;
 use Duxbo\Seo\Settings\SettingsRepository;
@@ -102,6 +104,32 @@ final class OctaneSupportTest extends TestCase
         $rebuilt = $manager->driver('claude');
 
         $this->assertNotSame($first, $rebuilt);
+    }
+
+    public function test_ai_circuit_breaker_sees_another_workers_trip_only_after_reset(): void
+    {
+        /** @var AiCircuitBreaker $breaker */
+        $breaker = $this->app->make(AiCircuitBreaker::class);
+
+        // Memoizes "closed" locally — nothing in the shared store yet.
+        $breaker->assertClosed('claude');
+
+        // A different worker's own instance trips the circuit and writes
+        // that directly to the shared store this one does not own.
+        $this->app->make(Cache::class)->put('duxbo.seo.ai_circuit.claude', [
+            'failures' => 99,
+            'openUntil' => time() + 3600,
+        ], 3600);
+
+        // Still closed from here: the first assertClosed() call above
+        // already memoized "closed" locally.
+        $breaker->assertClosed('claude');
+        $this->addToAssertionCount(1);
+
+        $breaker->resetForNewRequest();
+
+        $this->expectException(AiCircuitOpen::class);
+        $breaker->assertClosed('claude');
     }
 
     public function test_settings_repository_reapplies_overrides_to_the_live_config(): void

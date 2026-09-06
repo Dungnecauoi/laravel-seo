@@ -11,6 +11,50 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Added — grounded AI suggestions, meta tools, and a circuit breaker
+
+Rounds out the tool registry (still no console-command wrapping — see the
+first phase's notes on why) and gives the AI subsystem real capabilities
+beyond the original `suggestMeta`/`suggestKeywords`, all grounded in actual
+data rather than raw content alone:
+
+- **`AiManager::suggestContentFixes()`** — the same `{title, description}`
+  shape as `suggestMeta()`, but the prompt names the exact
+  `AnalysisReport::problems()` findings (translated through the same
+  `Translator` the panel uses, never a raw key like
+  `seo::analysis.content_length.short`) so the model fixes what is actually
+  wrong instead of writing generic meta from scratch.
+- **`AiManager::suggestRedirectTarget()`** and **`suggestInternalLinkFixes()`**
+  — both take a caller-built shortlist of *real* candidate URLs (ranked by a
+  simple title/slug word-overlap heuristic, see `Ai\Tools\Concerns\RanksCandidatesByTitleOverlap`)
+  and their JSON Schema constrains the answer to an `enum` of exactly those
+  URLs — a model cannot hallucinate a redirect target or a link source no
+  matter what the prompt alone asks for.
+- **`PromptLibrary::meta()`** gained optional `$current`/`$siteBrand`/
+  `$findings` parameters — grounding context appended as a clearly separate
+  section, capped by a new `seo.ai.context_characters` (default 1000,
+  distinct from `content_characters`). Passing none of them (every existing
+  caller) produces byte-for-byte the same prompt as before.
+- **Six new tools**: `seo.meta.suggest`/`.apply`/`.delete` (closing a gap
+  from the tool registry's first phase — Meta only had a Read tool until
+  now), `seo.analysis.suggest_fixes`, `seo.not_found.suggest_redirect_target`,
+  `seo.internal_links.suggest_fixes`. `ApplyMetaTool` runs the same off-site
+  canonical check `MetaController::update()` runs through Laravel's
+  validator, reached directly since an AI tool call never goes through it.
+- **`Ai\AiCircuitBreaker`** — after `seo.ai.circuit_breaker.threshold`
+  (default 5) consecutive failures from one driver, it stops being tried at
+  all for `cooldown_seconds` (default 60), so a loop over a few thousand
+  records does not retry a provider that is already down once per record.
+  Independent of `daily_token_budget`, which caps spend, not failure storms.
+  Implements `ResetsBetweenRequests` like the package's other Octane-aware
+  singletons, since the failure count is real cross-worker state.
+
+Deliberately deferred, same reasoning as the console-command tools: batch
+variants (a generator over many records checking the remaining daily budget
+between items) and per-scope/per-tenant budget partitioning — both are
+straightforward to add once there is a real caller shaped like one, and
+building either speculatively risked guessing that shape wrong.
+
 ### Added — a REST manifest and an MCP endpoint for the AI tool registry
 
 The tool registry from the last two phases was only reachable in-process

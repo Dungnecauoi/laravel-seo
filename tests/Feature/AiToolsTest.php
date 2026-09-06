@@ -7,12 +7,14 @@ namespace Duxbo\Seo\Tests\Feature;
 use Duxbo\Seo\Ai\Tools\AiToolDispatcher;
 use Duxbo\Seo\Ai\Tools\AiToolRegistry;
 use Duxbo\Seo\Audit\AuditBatch;
+use Duxbo\Seo\Contracts\MetadataRepository;
 use Duxbo\Seo\Data\AiToolContext;
 use Duxbo\Seo\Enums\AiToolResultStatus;
 use Duxbo\Seo\Exceptions\AiToolNotFound;
 use Duxbo\Seo\Exceptions\AiToolProposalExpired;
 use Duxbo\Seo\Exceptions\AiToolUnauthorized;
 use Duxbo\Seo\Exceptions\InvalidSettingValue;
+use Duxbo\Seo\Exceptions\UnsafeCanonical;
 use Duxbo\Seo\Exceptions\UnsafeRedirect;
 use Duxbo\Seo\Facades\Seo;
 use Duxbo\Seo\Redirects\RedirectRepository;
@@ -37,6 +39,10 @@ final class AiToolsTest extends TestCase
         parent::defineEnvironment($app);
 
         $app['config']->set('seo.api.models', ['post']);
+        $app['config']->set('seo.ai.default', 'claude');
+        $app['config']->set('seo.ai.cache_ttl', 0);
+        $app['config']->set('seo.ai.drivers.claude.key', 'test-key');
+        $app['config']->set('seo.ai.drivers.claude.model', 'claude-sonnet-5');
     }
 
     protected function setUp(): void
@@ -420,6 +426,143 @@ final class AiToolsTest extends TestCase
 
         $this->assertTrue($applied->data['submitted']);
         Http::assertSentCount(1);
+    }
+
+    public function test_suggest_meta_tool_grounds_the_prompt_in_stored_metadata_and_calls_ai(): void
+    {
+        $post = Post::query()->create(['name' => 'Bài viết mẫu', 'slug' => 'bai-viet-mau']);
+        Seo::save($post, ['title' => 'Tiêu đề đã lưu']);
+        $this->fakeClaude(['title' => 'Tiêu đề mới', 'description' => 'Mô tả mới']);
+
+        $result = $this->dispatcher()->call('seo.meta.suggest', [
+            'type' => 'post', 'id' => (string) $post->id, 'content' => '<p>Nội dung</p>',
+        ], new AiToolContext());
+
+        $this->assertSame('Tiêu đề mới', $result->data['title']);
+
+        Http::assertSent(function ($request): bool {
+            $this->assertStringContainsString('Tiêu đề đã lưu', $request->data()['messages'][0]['content']);
+
+            return true;
+        });
+    }
+
+    public function test_apply_meta_tool_writes_only_after_confirming(): void
+    {
+        $post = Post::query()->create(['name' => 'Bài viết mẫu', 'slug' => 'bai-viet-mau']);
+        $context = new AiToolContext();
+
+        $proposed = $this->dispatcher()->call('seo.meta.apply', [
+            'type' => 'post', 'id' => (string) $post->id, 'title' => 'Tiêu đề AI đề xuất',
+        ], $context);
+
+        $this->assertNotSame('Tiêu đề AI đề xuất', Seo::for($post)->title);
+
+        $this->dispatcher()->call('seo.meta.apply', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertSame('Tiêu đề AI đề xuất', Seo::for($post)->title);
+    }
+
+    public function test_apply_meta_tool_refuses_an_off_site_canonical_on_the_propose_call(): void
+    {
+        $post = Post::query()->create(['name' => 'Bài viết mẫu', 'slug' => 'bai-viet-mau']);
+
+        $this->expectException(UnsafeCanonical::class);
+
+        $this->dispatcher()->call('seo.meta.apply', [
+            'type' => 'post', 'id' => (string) $post->id, 'canonical' => 'https://trang-lua-dao.com',
+        ], new AiToolContext());
+    }
+
+    public function test_delete_meta_tool_deletes_only_after_confirming(): void
+    {
+        $post = Post::query()->create(['name' => 'Bài viết mẫu', 'slug' => 'bai-viet-mau']);
+        Seo::save($post, ['title' => 'Tiêu đề']);
+        $context = new AiToolContext();
+
+        $proposed = $this->dispatcher()->call('seo.meta.delete', ['type' => 'post', 'id' => (string) $post->id], $context);
+        $this->assertNotNull($this->app->make(MetadataRepository::class)->find($post));
+
+        $this->dispatcher()->call('seo.meta.delete', [], $context, confirm: $proposed->proposalId);
+        $this->assertNull($this->app->make(MetadataRepository::class)->find($post));
+    }
+
+    public function test_suggest_content_fixes_tool_grounds_the_prompt_in_real_analysis_findings(): void
+    {
+        $post = Post::query()->create(['name' => 'Bài viết mẫu', 'slug' => 'bai-viet-mau']);
+        $this->fakeClaude(['title' => 'Tiêu đề sửa', 'description' => 'Mô tả sửa']);
+
+        // A handful of words is well under any content-length minimum.
+        $result = $this->dispatcher()->call('seo.analysis.suggest_fixes', [
+            'type' => 'post', 'id' => (string) $post->id, 'content' => '<p>Rất ngắn.</p>', 'locale' => 'vi',
+        ], new AiToolContext());
+
+        $this->assertSame('Tiêu đề sửa', $result->data['title']);
+        $this->assertContains('content-length', $result->data['addressedProblems']);
+
+        Http::assertSent(function ($request): bool {
+            $prompt = $request->data()['messages'][0]['content'];
+            $this->assertStringNotContainsString('seo::analysis', $prompt);
+
+            return true;
+        });
+    }
+
+    public function test_suggest_redirect_target_tool_builds_real_candidates_from_existing_posts(): void
+    {
+        Post::query()->create(['name' => 'Hướng dẫn SEO', 'slug' => 'huong-dan-seo']);
+        Post::query()->create(['name' => 'Công thức nấu ăn', 'slug' => 'cong-thuc-nau-an']);
+
+        DB::table('seo_not_found')->insert([
+            'id' => 1, 'path' => '/huong-dan-seo-cu', 'path_hash' => md5('/huong-dan-seo-cu'),
+            'hits' => 1, 'first_seen_at' => now(), 'last_seen_at' => now(),
+        ]);
+
+        $this->fakeClaude(['targetUrl' => 'https://trangcuatoi.vn/bai-viet/huong-dan-seo', 'reasoning' => 'Khớp từ khoá']);
+
+        $result = $this->dispatcher()->call('seo.not_found.suggest_redirect_target', ['id' => 1], new AiToolContext());
+
+        $this->assertSame('https://trangcuatoi.vn/bai-viet/huong-dan-seo', $result->data['targetUrl']);
+        $this->assertNotEmpty($result->data['candidates']);
+
+        Http::assertSent(function ($request): bool {
+            $schema = $request->data()['tools'][0]['input_schema'];
+
+            // The unrelated recipe post must not even be offered as a candidate.
+            $this->assertContains('https://trangcuatoi.vn/bai-viet/huong-dan-seo', $schema['properties']['targetUrl']['enum']);
+            $this->assertNotContains('https://trangcuatoi.vn/bai-viet/cong-thuc-nau-an', $schema['properties']['targetUrl']['enum']);
+
+            return true;
+        });
+    }
+
+    public function test_suggest_internal_link_fixes_tool_builds_real_candidates_from_sibling_posts(): void
+    {
+        $orphan = Post::query()->create(['name' => 'Hướng dẫn SEO nâng cao', 'slug' => 'huong-dan-seo-nang-cao']);
+        $related = Post::query()->create(['name' => 'Hướng dẫn SEO cơ bản', 'slug' => 'huong-dan-seo-co-ban']);
+        Post::query()->create(['name' => 'Công thức nấu ăn', 'slug' => 'cong-thuc-nau-an']);
+
+        $this->fakeClaude(['suggestions' => [
+            ['sourceUrl' => $related->seoUrl(), 'anchorText' => 'hướng dẫn SEO cơ bản'],
+        ]]);
+
+        $result = $this->dispatcher()->call('seo.internal_links.suggest_fixes', [
+            'type' => 'post', 'id' => (string) $orphan->id,
+        ], new AiToolContext());
+
+        $this->assertSame($related->seoUrl(), $result->data['suggestions'][0]['sourceUrl']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    private function fakeClaude(array $input): void
+    {
+        Http::fake(['api.anthropic.com/*' => Http::response([
+            'model' => 'claude-sonnet-5',
+            'content' => [['type' => 'tool_use', 'input' => $input]],
+            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
+        ])]);
     }
 
     private function registerFakeTools(): void
