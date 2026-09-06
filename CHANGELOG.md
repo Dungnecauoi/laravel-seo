@@ -11,6 +11,45 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Added — a REST manifest and an MCP endpoint for the AI tool registry
+
+The tool registry from the last two phases was only reachable in-process
+(`app(AiToolDispatcher::class)->call(...)`). Two thin protocol adapters over
+the same registry, so any external AI agent or framework can reach it
+without writing PHP:
+
+- **`GET /api/seo/v1/ai/tools`** — the manifest, with both `input_schema`
+  (Anthropic tool-use shape) and `parameters` (OpenAI function-calling
+  shape) pointing at the identical JSON Schema, so one response serves
+  either SDK's `tools` array as-is. **`POST /api/seo/v1/ai/tools/{name}/call`**
+  — `{input, confirm}` reaching the same `AiToolDispatcher::call()` every
+  in-process caller already goes through. Domain exceptions map to the HTTP
+  status an existing caller of these repositories would expect:
+  `AiToolNotFound` 404, `AiToolUnauthorized` 403, `AiToolProposalExpired` 409,
+  any other `SeoException` (an unsafe redirect, an invalid setting value)
+  422.
+- **`POST /api/seo/v1/mcp`** — a hand-rolled MCP (Model Context Protocol)
+  server speaking JSON-RPC 2.0 over the non-streaming half of the
+  [Streamable HTTP transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports):
+  `initialize`, `ping`, `tools/list`, `tools/call`. No SSE, no session
+  management, no resources/prompts/sampling — nothing here streams and every
+  call is stateless, so none of that half of the spec is needed. Point
+  Claude Code, Claude Desktop, or any other MCP client at this endpoint and
+  every registered tool is immediately callable, with zero glue code written
+  by the package or the installer. `GET`/`DELETE` on the same path answer
+  405, exactly as the spec prescribes for a server that offers neither the
+  server-initiated stream nor explicit session termination.
+
+MCP's `tools/call` has only one `arguments` object, unlike the REST
+endpoint's separate `input`/`confirm` fields — so for a Write/Destructive
+tool, `arguments.confirm` carries the proposal id on the second call, making
+`confirm` a reserved argument name no tool's own `inputSchema` should use.
+A business-logic refusal from inside a tool (an unsafe redirect, a missing
+record) is reported as a Tool Execution Error (`isError: true` inside a
+normal JSON-RPC *result*), never a JSON-RPC *error* — matching the spec's
+own split between protocol errors (unknown tool, bad params) and execution
+errors (this call specifically failed).
+
 ### Added — write and destructive AI tools
 
 Eight more tools on top of last phase's seven read-only ones, exercising the

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Duxbo\Seo\Http\Api\V1\AiToolsController;
 use Duxbo\Seo\Http\Api\V1\AnalyzeController;
 use Duxbo\Seo\Http\Api\V1\AuditHistoryController;
 use Duxbo\Seo\Http\Api\V1\ContentController;
@@ -9,6 +10,7 @@ use Duxbo\Seo\Http\Api\V1\DashboardController;
 use Duxbo\Seo\Http\Api\V1\DynamicSettingsController;
 use Duxbo\Seo\Http\Api\V1\IndexNowLogController;
 use Duxbo\Seo\Http\Api\V1\InternalLinksController;
+use Duxbo\Seo\Http\Api\V1\McpController;
 use Duxbo\Seo\Http\Api\V1\MetaController;
 use Duxbo\Seo\Http\Api\V1\NotFoundController;
 use Duxbo\Seo\Http\Api\V1\RedirectsController;
@@ -81,4 +83,19 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
         Route::get('internal-links', [InternalLinksController::class, 'index']);
         Route::get('search-console/stats', [SearchConsoleStatsController::class, 'index']);
         Route::get('indexnow/log', [IndexNowLogController::class, 'index']);
+
+        // Every capability above, described well enough for an AI agent to
+        // discover and call without hand-written glue. The manifest and
+        // dispatch share the same registry — a Write/Destructive tool
+        // reached here still goes through its own useSeoAiWrites/
+        // useSeoAiDestructive Gate check inside the dispatcher, on top of
+        // this whole group's viewSeoPanel.
+        Route::get('ai/tools', [AiToolsController::class, 'index']);
+        Route::post('ai/tools/{name}/call', [AiToolsController::class, 'call'])->where('name', '[a-z0-9_.]+');
+
+        // The MCP (Model Context Protocol) endpoint — the same tool
+        // registry, spoken as JSON-RPC 2.0 so Claude Code, Claude Desktop
+        // and any other MCP client can attach to this application directly.
+        Route::post('mcp', McpController::class);
+        Route::match(['get', 'delete'], 'mcp', [McpController::class, 'notSupported']);
     });

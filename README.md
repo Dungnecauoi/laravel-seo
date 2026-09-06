@@ -555,7 +555,26 @@ whatever the confirming call sends. Every propose and apply is logged to
 `seo.settings.get`) plus eight that write or delete
 (`seo.redirects.create`/`.toggle`/`.delete`,
 `seo.not_found.prune`/`.convert_to_redirect`, `seo.settings.set`/`.clear`,
-`seo.indexnow.submit`) — a REST/MCP surface for external agents is next.
+`seo.indexnow.submit`).
+
+Two ways an external agent reaches the same registry, no PHP required:
+
+```ts
+await fetch(`${API}/api/seo/v1/ai/tools`)                              // manifest — input_schema (Anthropic) and parameters (OpenAI), same schema
+await fetch(`${API}/api/seo/v1/ai/tools/seo.redirects.create/call`, {  // {input, confirm} -> the same dispatcher every in-process caller uses
+  method: 'POST', body: JSON.stringify({ input: { source: '/cu', target: '/moi' } }),
+})
+```
+
+`POST /api/seo/v1/mcp` speaks [MCP](https://modelcontextprotocol.io) —
+JSON-RPC 2.0 (`initialize`, `tools/list`, `tools/call`) over the
+non-streaming half of the Streamable HTTP transport, hand-rolled with no
+new dependency. Point Claude Code, Claude Desktop, or any other MCP client
+at it and every tool above is immediately callable — no glue code, on
+either side. MCP's `tools/call` has only one `arguments` object, so the
+propose/confirm cycle rides inside it: `arguments.confirm` set to a
+proposal's id on the second call is the MCP equivalent of the REST
+endpoint's separate `confirm` field.
 
 ### The npm client
 

@@ -78,6 +78,7 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(Canonical\CanonicalGuard::class);
         $this->app->singleton(Ai\Tools\AiToolRegistry::class);
         $this->app->singleton(Ai\Tools\AiToolDispatcher::class);
+        $this->app->singleton(Mcp\McpServer::class);
         $this->app->singleton(NotFound\NotFoundLogger::class);
         $this->app->singleton(Robots\RobotsTxt::class);
         $this->app->singleton(Ai\AiBudget::class);
