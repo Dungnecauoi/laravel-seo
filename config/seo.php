@@ -653,78 +653,19 @@ return [
     | AI assistance
     |--------------------------------------------------------------------------
     |
-    | Off by default: installing a package must never start billing anyone.
-    | Set 'default' to claude, openai, gemini, groq or openrouter once a key
-    | is configured.
+    | Which driver talks to a model, its budget, cache and circuit breaker
+    | all live in `duxbo/laravel-ai-core`'s own config (config/ai-core.php) —
+    | this package is one consumer of that shared layer, not where AI itself
+    | is configured. Off by default there too: installing either package
+    | must never start billing anyone.
     |
-    | Drivers call plain documented REST through Laravel's HTTP client. No
-    | vendor SDK is required or suggested — three SDKs would be three more
-    | libraries whose next major becomes this package's problem, for a feature
-    | that is off by default.
-    |
-    | Model names live here rather than in the drivers. They change often, and
-    | a hard-coded one turns into a maintenance task every few months.
+    | What's left here is specific to SEO: how much of the page's own content
+    | (and the grounding context built around it) goes into a prompt, and
+    | which of this package's capabilities are exposed as AI tools.
     |
     */
 
     'ai' => [
-        'default' => env('SEO_AI_DRIVER', 'null'),
-
-        'drivers' => [
-            'claude' => [
-                'key' => env('ANTHROPIC_API_KEY'),
-                'model' => env('SEO_AI_MODEL', 'claude-sonnet-5'),
-                'timeout' => 30,
-                'retries' => 2,
-            ],
-
-            'openai' => [
-                'key' => env('OPENAI_API_KEY'),
-                'model' => env('SEO_AI_MODEL'),
-                'base_url' => 'https://api.openai.com/v1',
-                'timeout' => 30,
-                'retries' => 2,
-            ],
-
-            'gemini' => [
-                'key' => env('GEMINI_API_KEY'),
-                'model' => env('SEO_AI_MODEL'),
-                'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
-                'timeout' => 30,
-                'retries' => 2,
-            ],
-
-            'groq' => [
-                'key' => env('GROQ_API_KEY'),
-                'model' => env('SEO_AI_MODEL'),
-                'base_url' => 'https://api.groq.com/openai/v1',
-                'timeout' => 30,
-                'retries' => 2,
-            ],
-
-            'openrouter' => [
-                'key' => env('OPENROUTER_API_KEY'),
-                'model' => env('SEO_AI_MODEL'),
-                'base_url' => 'https://openrouter.ai/api/v1',
-                'timeout' => 30,
-                'retries' => 2,
-                // Optional — OpenRouter's own docs ask for these for its
-                // public leaderboard attribution, not for the request to work.
-                'referer' => env('APP_URL'),
-                'title' => env('SEO_SITE_NAME', env('APP_NAME')),
-            ],
-        ],
-
-        // Same content and prompt is never billed twice. Seconds; 0 disables.
-        'cache_ttl' => 86400,
-
-        // A loop over a few thousand records is an ordinary thing to write and
-        // an expensive thing to run. 0 removes the cap.
-        'daily_token_budget' => 200000,
-
-        'log' => true,
-        'table' => 'seo_ai_log',
-
         // Markup is noise the model pays for by the token.
         'content_characters' => 4000,
 
@@ -734,25 +675,6 @@ return [
         // content_characters so adding a new context source never silently
         // grows the effective prompt budget without a number to point at.
         'context_characters' => 1000,
-
-        // After this many consecutive failures, a driver stops being tried
-        // at all for a while — a loop over a few thousand records must not
-        // retry a provider that is already down once per record. Independent
-        // of daily_token_budget, which caps spend, not failure storms.
-        'circuit_breaker' => [
-            'enabled' => true,
-            'threshold' => 5,
-            'cooldown_seconds' => 60,
-        ],
-
-        // Published prices change; a hard-coded rate would make the cost column
-        // quietly wrong. Rates are per million tokens.
-        'pricing' => [
-            'currency' => 'USD',
-            'models' => [
-                // 'claude-sonnet-5' => ['input' => 3.00, 'output' => 15.00],
-            ],
-        ],
 
         /*
         |----------------------------------------------------------------------
@@ -811,6 +733,31 @@ return [
             'table' => 'seo_ai_tool_calls',
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI core overrides
+    |--------------------------------------------------------------------------
+    |
+    | Pushed into `ai-core.profiles.seo` on boot (see
+    | SeoServiceProvider::applyAiProfile()) — the mechanism a project uses to
+    | give SEO its own default driver, model or daily budget, distinct from
+    | another package (media, an agent runner) sharing the same
+    | `duxbo/laravel-ai-core` install. Empty by default: with nothing set
+    | here, SEO simply uses ai-core's own top-level defaults, exactly as if
+    | this key did not exist.
+    |
+    | Only the fields that actually need to differ belong here — a partial
+    | override like the one below still inherits everything else (the API
+    | key, for instance) from ai-core's own config:
+    |
+    |   'ai_overrides' => [
+    |       'drivers' => ['claude' => ['model' => 'claude-haiku']],
+    |       'daily_token_budget' => 50000,
+    |   ],
+    |
+    */
+    'ai_overrides' => [],
 
     /*
     |--------------------------------------------------------------------------

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Ai\Tools\Analysis;
 
-use Duxbo\Seo\Ai\AiManager;
+use Duxbo\Seo\Ai\SeoAiManager;
 use Duxbo\Seo\Contracts\AiTool;
 use Duxbo\Seo\Data\AiToolContext;
 use Duxbo\Seo\Enums\AiToolRisk;
@@ -24,7 +24,7 @@ final class SuggestContentFixesTool implements AiTool
 
     public function __construct(
         private readonly Seo $seo,
-        private readonly AiManager $ai,
+        private readonly SeoAiManager $ai,
     ) {
     }
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo;
 
-use Duxbo\Seo\Ai\AiManager;
+use Duxbo\Seo\Ai\SeoAiManager;
 use Duxbo\Seo\Analysis\Analyzer;
 use Duxbo\Seo\Canonical\CanonicalGuard;
 use Duxbo\Seo\Contracts\AnalysisCheck;
@@ -48,7 +48,7 @@ final class Seo
         private readonly GraphAssembler $assembler,
         private readonly SchemaValidator $validator,
         private readonly Analyzer $analyzer,
-        private readonly AiManager $ai,
+        private readonly SeoAiManager $ai,
         private readonly UrlGenerator $urls,
         private readonly Dispatcher $events,
         private readonly CanonicalGuard $canonicalGuard,
@@ -326,7 +326,7 @@ final class Seo
      * The language model manager — `Seo::ai()->driver('claude')`, or
      * `Seo::ai()->extend('my-llm', …)` to plug in your own.
      */
-    public function ai(): AiManager
+    public function ai(): SeoAiManager
     {
         return $this->ai;
     }

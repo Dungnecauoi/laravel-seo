@@ -71,6 +71,7 @@ final class SeoServiceProvider extends ServiceProvider
 
         $this->app->singleton(Settings\SettingsRepository::class);
         $this->applyDynamicSettings();
+        $this->applyAiProfile();
 
         $this->app->singleton(Storage\SeoDataMapper::class);
         $this->app->singleton(SchemaNormalizer::class);
@@ -82,10 +83,8 @@ final class SeoServiceProvider extends ServiceProvider
         $this->app->singleton(Mcp\McpServer::class);
         $this->app->singleton(NotFound\NotFoundLogger::class);
         $this->app->singleton(Robots\RobotsTxt::class);
-        $this->app->singleton(Ai\AiBudget::class);
-        $this->app->singleton(Ai\AiCircuitBreaker::class);
         $this->app->singleton(Ai\PromptLibrary::class);
-        $this->app->singleton(Ai\AiManager::class);
+        $this->app->singleton(Ai\SeoAiManager::class);
         $this->app->singleton(SiteIndexability::class);
         $this->app->singleton(AlternateLocaleResolver::class);
         $this->app->singleton(\Duxbo\Seo\Support\SameOriginUrls::class);
@@ -125,6 +124,26 @@ final class SeoServiceProvider extends ServiceProvider
         }
 
         $this->app->make(Settings\SettingsRepository::class)->applyToConfig();
+    }
+
+    /**
+     * Pushes `config('seo.ai_overrides')` into `ai-core.profiles.seo` before
+     * anything in this package resolves a driver through {@see Ai\SeoAiManager}
+     * — the mechanism that lets this project give SEO a different default
+     * model, or a smaller daily budget, than another package sharing the same
+     * `duxbo/laravel-ai-core` install, without editing ai-core's own config.
+     *
+     * Left alone (an empty array) when nothing is set, so a project using
+     * only SEO configures AI once, in `ai-core.php`, exactly as if this
+     * package were not in the picture at all.
+     */
+    private function applyAiProfile(): void
+    {
+        $overrides = (array) $this->app['config']->get('seo.ai_overrides', []);
+
+        if ($overrides !== []) {
+            $this->app['config']->set('ai-core.profiles.seo', $overrides);
+        }
     }
 
     public function boot(): void
@@ -179,9 +198,12 @@ final class SeoServiceProvider extends ServiceProvider
      * longer than the one request or job they were first built for — each
      * reason is documented on {@see ResetsBetweenRequests} and on the class
      * itself: `CachedRedirectMatcher` would keep serving a redirect list
-     * another worker already changed, `AiManager` would keep a driver built
-     * from config that has since been edited, and a dynamic setting saved
-     * through the API would never reach an already-running worker at all.
+     * another worker already changed, and a dynamic setting saved through
+     * the API would never reach an already-running worker at all.
+     * `duxbo/laravel-ai-core`'s own `AiManager` and `AiCircuitBreaker` have
+     * the identical problem — its own service provider wires the same reset
+     * into the same two events independently, so this package does not
+     * need to (and no longer can, since it does not own those classes).
      *
      * - Laravel Octane (Swoole, RoadRunner, FrankenPHP) keeps the whole
      *   application booted across many HTTP requests.
@@ -222,8 +244,6 @@ final class SeoServiceProvider extends ServiceProvider
     {
         return [
             RedirectMatcher::class,
-            Ai\AiManager::class,
-            Ai\AiCircuitBreaker::class,
             Settings\SettingsRepository::class,
         ];
     }
@@ -427,7 +447,7 @@ final class SeoServiceProvider extends ServiceProvider
                 $app->make(GraphAssembler::class),
                 $app->make(SchemaValidator::class),
                 $app->make(Analyzer::class),
-                $app->make(Ai\AiManager::class),
+                $app->make(Ai\SeoAiManager::class),
                 $app->make(UrlGenerator::class),
                 $app->make(Dispatcher::class),
                 $app->make(Canonical\CanonicalGuard::class),

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Ai;
 
-use Duxbo\Seo\Data\AiRequest;
+use Duxbo\AiCore\Data\AiRequest;
 use Duxbo\Seo\Data\CheckResult;
 use Duxbo\Seo\Data\SeoData;
 use Duxbo\Seo\Support\Text;

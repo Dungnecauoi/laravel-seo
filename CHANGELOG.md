@@ -11,6 +11,41 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Changed — the AI driver layer moved into `duxbo/laravel-ai-core`
+
+`AiManager`, `AiBudget`, `AiCircuitBreaker`, the five REST drivers
+(Claude/OpenAI/Gemini/Groq/OpenRouter), `AiRequest`/`AiResponse` and their
+dynamic-settings/REST-API surface are no longer part of this package — they
+now live in [`duxbo/laravel-ai-core`](https://github.com/Dungnecauoi/laravel-ai-core),
+a new required dependency shared with any other package (a media package,
+an agent runner) that also needs to talk to a model, so a fix or a new
+provider is made in one place instead of once per package. This package's
+own AI tool registry — `Contracts\AiTool`, `AiToolRegistry`,
+`AiToolDispatcher`, the MCP server, all 27 tools — is unaffected and stays
+here, since it is specific to what this package exposes, not to how a
+request reaches a model.
+
+**Breaking, for anyone already using the pre-1.0 `seo.ai.*` config:**
+`seo.ai.default`, `seo.ai.drivers.*`, `seo.ai.cache_ttl`,
+`seo.ai.daily_token_budget`, `seo.ai.circuit_breaker.*` and
+`seo.ai.pricing.*` are gone — the equivalent keys now live in
+`config/ai-core.php`. `seo_ai_log` is replaced by `ai-core`'s own
+`ai_core_log` (scoped `profile = 'seo'` for this package's own calls);
+since nothing here has run in production, there is no data to migrate.
+`Seo::ai()` now returns a new `Ai\SeoAiManager` rather than `Ai\AiManager`
+directly, but every existing call site (`suggestMeta()`, `suggestKeywords()`,
+`suggestContentFixes()`, `suggestRedirectTarget()`,
+`suggestInternalLinkFixes()`, `driver()`, `extend()`) keeps its exact same
+signature. A project that wants SEO to use a different model or budget than
+another package sharing the same `ai-core` install sets `config('seo.php')`'s
+new `ai_overrides` key — see the README's "AI assistance" section.
+
+Supported Laravel/testbench/PHPUnit versions are narrowed to match
+`ai-core`'s own (Laravel 11–13; testbench 9–11; PHPUnit 10.5–12) rather than
+the broader, untested 9–13 range this package's `composer.json` previously
+allowed — the package's own Docker matrix never actually tested 9, 10 or 11
+in the first place, both being past their security EOL.
+
 ### Added — a human confirms an AI proposal from the panel; console commands become AI tools
 
 The two items the previous phase deliberately deferred:

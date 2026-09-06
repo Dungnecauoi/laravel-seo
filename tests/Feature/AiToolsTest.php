@@ -39,10 +39,10 @@ final class AiToolsTest extends TestCase
         parent::defineEnvironment($app);
 
         $app['config']->set('seo.api.models', ['post']);
-        $app['config']->set('seo.ai.default', 'claude');
-        $app['config']->set('seo.ai.cache_ttl', 0);
-        $app['config']->set('seo.ai.drivers.claude.key', 'test-key');
-        $app['config']->set('seo.ai.drivers.claude.model', 'claude-sonnet-5');
+        $app['config']->set('ai-core.default', 'claude');
+        $app['config']->set('ai-core.cache_ttl', 0);
+        $app['config']->set('ai-core.drivers.claude.key', 'test-key');
+        $app['config']->set('ai-core.drivers.claude.model', 'claude-sonnet-5');
     }
 
     protected function setUp(): void

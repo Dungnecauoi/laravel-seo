@@ -12,6 +12,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+AI_CORE_ROOT="$(cd "${ROOT}/../ai-core" && pwd)"
 IMAGE_PREFIX="laravel-seo-test"
 
 # laravel | php | testbench
@@ -70,12 +71,16 @@ for row in "${MATRIX[@]}"; do
   # with the package.
   OUTPUT=$(docker run --rm \
     -v "${ROOT}:/src:ro" \
+    -v "${AI_CORE_ROOT}:/ai-core:ro" \
     -e "TESTBENCH=${TESTBENCH}" \
     "$IMAGE" \
     bash -c '
       set -e
       # Copy rather than work in the mount: the host keeps its own vendor/
       # and composer.lock, and nothing written here survives the container.
+      # /ai-core sits next to /app_src for the same reason it sits next to
+      # this package on the host: composer.json points a path repository at
+      # "../ai-core", relative to wherever this package itself lives.
       cp -r /src /app_src && cd /app_src
       rm -rf vendor composer.lock .git
 

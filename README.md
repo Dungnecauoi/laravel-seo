@@ -511,28 +511,37 @@ Seo::ai()->suggestKeywords($html, 'vi');
 Seo::ai()->extend('my-llm', fn () => new MyDriver());
 ```
 
-Claude, OpenAI, Gemini, Groq and OpenRouter are reached over plain REST
-through Laravel's HTTP client; no vendor SDK is required or even suggested.
-Each driver asks its provider for schema-constrained output — tool use,
-`json_schema`, `responseSchema` — and prose where an object was expected is
-an error, never something to parse.
+`Seo::ai()` is this package's own thin face on
+[`duxbo/laravel-ai-core`](https://github.com/Dungnecauoi/laravel-ai-core), a
+required dependency that talks to Claude, OpenAI, Gemini, Groq and
+OpenRouter over plain REST — no vendor SDK, caching, a daily token budget, a
+circuit breaker, and its own REST API a settings UI can drive. What model,
+budget and provider it uses lives in **that package's own**
+`config/ai-core.php`, not here; installing SEO installs it too, but every
+call above is still `null` and free until a driver is actually configured
+there. Each driver asks its provider for schema-constrained output — tool
+use, `json_schema`, `responseSchema` — and prose where an object was
+expected is an error, never something to parse.
 
-Groq and OpenRouter both speak OpenAI's own Chat Completions shape, so their
-drivers are a few lines each over a shared `OpenAiCompatibleDriver` —
-`seo.ai.drivers.groq.model`/`.openrouter.model` need to name a model that
-actually honours `response_format: json_schema`, since that support depends
-on the underlying model, not on either platform itself. `Seo::ai()->extend()`
-reaches any other OpenAI-compatible endpoint (a self-hosted vLLM server, for
-instance) the same way, or a genuinely different API shape entirely.
+Sharing `ai-core` across several packages (SEO plus a media or agent
+package of your own) is the point: give SEO a different default model, or
+its own smaller budget, without touching `ai-core.php` at all, through
+`config/seo.php`'s own `ai_overrides`:
+
+```php
+// config/seo.php
+'ai_overrides' => [
+    'drivers' => ['claude' => ['model' => 'claude-haiku']],
+    'daily_token_budget' => 50000,
+],
+```
 
 Prompts are translated, not just their output: an English instruction asking
-for a Vietnamese description reliably produces stilted Vietnamese. Results are
-cached by content hash, every call is logged with its tokens, a daily token
-budget caps what a runaway loop can spend, and a circuit breaker stops
-retrying a driver that has failed `circuit_breaker.threshold` times in a row
-(default 5) for `cooldown_seconds` (default 60) — independent concerns:
-one caps spend, the other stops a loop from hammering a provider that is
-already down.
+for a Vietnamese description reliably produces stilted Vietnamese. Every
+call SEO makes is attributed to its own `'seo'` profile in `ai-core`'s
+usage log, so its spend is tracked separately from any other package
+sharing the same install — see `ai-core`'s own README for the budget,
+cache and circuit-breaker mechanics behind all of this.
 
 `suggestMeta()` can be grounded in what is already stored (`current`) and
 the site's own name (`siteBrand`) — an optional improvement, not a required
@@ -733,7 +742,8 @@ allowlist regardless of which surface is used.
 Supported without depending on either: a handful of this package's
 singletons cache something in an instance property rather than only in
 Laravel's own `Cache` store — `CachedRedirectMatcher`'s loaded rule set,
-`AiManager`'s built drivers, dynamic settings' applied config. Under
+dynamic settings' applied config, and (in `duxbo/laravel-ai-core`'s own
+service provider) its `AiManager`'s built drivers. Under
 ordinary PHP-FPM that never matters, since the whole container is rebuilt
 fresh every request. Under Octane (Swoole, RoadRunner, FrankenPHP) or an
 ordinary `php artisan queue:work`, the same singleton instance persists

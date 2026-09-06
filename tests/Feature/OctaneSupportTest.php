@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Tests\Feature;
 
-use Duxbo\Seo\Ai\AiCircuitBreaker;
-use Duxbo\Seo\Ai\AiManager;
 use Duxbo\Seo\Contracts\RedirectMatcher;
-use Duxbo\Seo\Exceptions\AiCircuitOpen;
 use Duxbo\Seo\Redirects\Redirect;
 use Duxbo\Seo\Redirects\RedirectRepository;
 use Duxbo\Seo\Settings\SettingsRepository;
@@ -16,7 +13,6 @@ use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Http;
 
 /**
  * Under ordinary PHP-FPM every singleton this package registers is rebuilt
@@ -27,6 +23,10 @@ use Illuminate\Support\Facades\Http;
  * provider's Octane listener makes; dispatching the real Octane event by
  * its class *name* (Octane itself is not installed in this suite) confirms
  * the listener is actually wired to it.
+ *
+ * `duxbo/laravel-ai-core`'s own `AiManager` and `AiCircuitBreaker` have the
+ * identical reset problem — its own OctaneSupportTest covers them; this
+ * package no longer owns those classes.
  */
 final class OctaneSupportTest extends TestCase
 {
@@ -75,61 +75,6 @@ final class OctaneSupportTest extends TestCase
         $matcher->resetForNewRequest();
 
         $this->assertSame('/moi-2', $matcher->match('/cu')?->target);
-    }
-
-    public function test_ai_manager_rebuilds_a_driver_from_current_config_after_reset(): void
-    {
-        Http::fake(['api.anthropic.com/*' => Http::response([
-            'content' => [['type' => 'tool_use', 'input' => ['title' => 'x']]],
-            'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
-        ])]);
-
-        config([
-            'seo.ai.drivers.claude.key' => 'old-key',
-            'seo.ai.drivers.claude.model' => 'claude-old',
-            'seo.ai.cache_ttl' => 0,
-        ]);
-
-        $manager = $this->app->make(AiManager::class);
-        $first = $manager->driver('claude');
-
-        config(['seo.ai.drivers.claude.model' => 'claude-new']);
-        $sameInstance = $manager->driver('claude');
-
-        // Without a reset, the memoized instance is still the one built
-        // from the old config — the config change alone changes nothing.
-        $this->assertSame($first, $sameInstance);
-
-        $manager->resetForNewRequest();
-        $rebuilt = $manager->driver('claude');
-
-        $this->assertNotSame($first, $rebuilt);
-    }
-
-    public function test_ai_circuit_breaker_sees_another_workers_trip_only_after_reset(): void
-    {
-        /** @var AiCircuitBreaker $breaker */
-        $breaker = $this->app->make(AiCircuitBreaker::class);
-
-        // Memoizes "closed" locally — nothing in the shared store yet.
-        $breaker->assertClosed('claude');
-
-        // A different worker's own instance trips the circuit and writes
-        // that directly to the shared store this one does not own.
-        $this->app->make(Cache::class)->put('duxbo.seo.ai_circuit.claude', [
-            'failures' => 99,
-            'openUntil' => time() + 3600,
-        ], 3600);
-
-        // Still closed from here: the first assertClosed() call above
-        // already memoized "closed" locally.
-        $breaker->assertClosed('claude');
-        $this->addToAssertionCount(1);
-
-        $breaker->resetForNewRequest();
-
-        $this->expectException(AiCircuitOpen::class);
-        $breaker->assertClosed('claude');
     }
 
     public function test_settings_repository_reapplies_overrides_to_the_live_config(): void

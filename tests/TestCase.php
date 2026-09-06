@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Tests;
 
+use Duxbo\AiCore\AiCoreServiceProvider;
 use Duxbo\Seo\SeoServiceProvider;
 use Duxbo\Seo\Support\Compat;
 use Illuminate\Database\Schema\Blueprint;
@@ -24,7 +25,7 @@ abstract class TestCase extends Orchestra
      */
     protected function getPackageProviders($app): array
     {
-        return [SeoServiceProvider::class];
+        return [AiCoreServiceProvider::class, SeoServiceProvider::class];
     }
 
     protected function defineEnvironment($app): void
@@ -53,6 +54,7 @@ abstract class TestCase extends Orchestra
     protected function defineDatabaseMigrations(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/../vendor/duxbo/laravel-ai-core/database/migrations');
 
         Schema::create('posts', function (Blueprint $table): void {
             $table->id();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Http\Api\V1;
 
+use Duxbo\AiCore\Config\AiCoreConfig;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -14,6 +15,10 @@ use Illuminate\Http\JsonResponse;
  */
 final class SettingsController extends ApiController
 {
+    public function __construct(private readonly AiCoreConfig $ai)
+    {
+    }
+
     public function __invoke(): JsonResponse
     {
         return $this->json([
@@ -25,8 +30,8 @@ final class SettingsController extends ApiController
             'exposedModels' => config('seo.api.models', []),
             'allowedHosts' => config('seo.redirects.allowed_hosts', []),
             'sitemapSourceCount' => count(config('seo.sitemap.sources', [])),
-            'aiDriver' => config('seo.ai.default', 'null'),
-            'aiBudget' => config('seo.ai.daily_token_budget', 0),
+            'aiDriver' => $this->ai->get('default', 'null', 'seo'),
+            'aiBudget' => $this->ai->get('daily_token_budget', 0, 'seo'),
             'analysisRateLimit' => config('seo.analysis.rate_limit', '30,1'),
             'supportedLocales' => config('seo.locales.supported', []),
         ]);
