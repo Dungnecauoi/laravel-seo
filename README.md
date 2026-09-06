@@ -593,6 +593,17 @@ propose/confirm cycle rides inside it: `arguments.confirm` set to a
 proposal's id on the second call is the MCP equivalent of the REST
 endpoint's separate `confirm` field.
 
+**Watching what an agent has actually done** — `GET /api/seo/v1/ai/tool-calls`
+and the Blade panel's own "Hoạt động AI" page both read `seo_ai_tool_calls`
+directly: every propose and apply, newest first. `<SeoAiToolCalls>` in
+`@duxbo/seo-react`/`-vue` is the same list for a project building its own
+admin surface. `php artisan seo:ai:tools` lists every registered tool with
+its risk tier, for checking what an agent can see without making a call to
+find out. None of this can confirm a pending proposal from the panel —
+that is a distinct, larger feature (a human approving an AI's action) this
+phase deliberately leaves for later, not a polish item on top of the
+registry.
+
 ### The npm client
 
 [`@duxbo/seo-core`](js/packages/core/) holds the types, the API client, and the
@@ -620,7 +631,7 @@ with no admin UI at all.
 **[`@duxbo/seo-react`](js/packages/react/)** and **[`@duxbo/seo-vue`](js/packages/vue/)**
 — hooks/composables plus a Tailwind-styled admin shell, built on
 `@duxbo/seo-core`, for a project with a front-end build step. `SeoPanel`
-edits one record; nine more components cover the rest, each fetching through
+edits one record; ten more components cover the rest, each fetching through
 the same `SeoClient` and none of them routing on its own:
 
 ```tsx
@@ -634,16 +645,18 @@ the same `SeoClient` and none of them routing on its own:
 <SeoInternalLinks client={client} type="post" />
 <SeoSearchConsoleStats client={client} />
 <SeoIndexNowLog client={client} />
+<SeoAiToolCalls client={client} />
 ```
 
-All ten need `seo.api.enabled = true` — they talk to `/api/seo/v1`, not the
-Blade panel's session routes — and this package's build output added to
+All eleven need `seo.api.enabled = true` — they talk to `/api/seo/v1`, not
+the Blade panel's session routes — and this package's build output added to
 Tailwind's `content` globs, or the classes are purged and everything renders
-unstyled. The last four are read-only views over what a console command
-already wrote (`seo:audit`, `seo:internal-links`,
-`seo:search-console:sync`, and every IndexNow submission's own log) — none
-of them run that work themselves, the same reason the Blade equivalents
-don't either.
+unstyled. Five are read-only views over what already happened elsewhere and
+never trigger that work themselves, the same reason their Blade equivalents
+don't either: four over what a console command wrote (`seo:audit`,
+`seo:internal-links`, `seo:search-console:sync`, every IndexNow submission's
+own log), one (`SeoAiToolCalls`) over what an AI agent did through the tool
+registry.
 
 `SeoSettings` also needs `seo.settings.enabled = true` for its edit form to
 appear at all — without it, the read-only status above still renders, and a

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Duxbo\Seo\Http\Controllers\PanelController;
+use Duxbo\Seo\Http\Controllers\Panel\AiToolCallsController;
 use Duxbo\Seo\Http\Controllers\Panel\AuditHistoryController;
 use Duxbo\Seo\Http\Controllers\Panel\ContentController;
 use Duxbo\Seo\Http\Controllers\Panel\DashboardController;
@@ -62,6 +63,7 @@ Route::prefix(config('seo.panel.prefix', 'seo/panel'))
         Route::get('internal-links', InternalLinksController::class)->name('internal-links');
         Route::get('search-console', SearchConsoleStatsController::class)->name('search-console');
         Route::get('indexnow-log', IndexNowLogController::class)->name('indexnow-log');
+        Route::get('ai-tool-calls', AiToolCallsController::class)->name('ai-tool-calls');
 
         Route::get('{type}/{id}', [PanelController::class, 'show'])->name('show');
         Route::get('{type}/{id}/data', [PanelController::class, 'data'])->name('data');

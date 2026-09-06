@@ -12,8 +12,13 @@ export { SeoAuditHistory } from './SeoAuditHistory.js'
 export { SeoInternalLinks } from './SeoInternalLinks.js'
 export { SeoSearchConsoleStats } from './SeoSearchConsoleStats.js'
 export { SeoIndexNowLog } from './SeoIndexNowLog.js'
+export { SeoAiToolCalls } from './SeoAiToolCalls.js'
 
 export type {
+  AiToolCallEntry,
+  AiToolCallsResponse,
+  AiToolManifestEntry,
+  AiToolManifestResponse,
   AnalysisReport,
   AuditBatchEntry,
   AuditHistoryResponse,

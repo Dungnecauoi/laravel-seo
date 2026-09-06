@@ -46,6 +46,7 @@ final class PanelHistoryPagesTest extends TestCase
         $this->get('/seo/panel/internal-links')->assertOk();
         $this->get('/seo/panel/search-console')->assertOk()->assertSee('Chưa có dữ liệu');
         $this->get('/seo/panel/indexnow-log')->assertOk()->assertSee('Chưa có lần gửi');
+        $this->get('/seo/panel/ai-tool-calls')->assertOk()->assertSee('Chưa có lần gọi tool AI');
     }
 
     public function test_audit_history_shows_scored_batches(): void
@@ -112,11 +113,34 @@ final class PanelHistoryPagesTest extends TestCase
         $this->assertStringContainsString('&lt;script&gt;', $body);
     }
 
+    public function test_ai_tool_calls_shows_the_risk_tier_and_status(): void
+    {
+        DB::table('seo_ai_tool_calls')->insert([
+            'tool' => 'seo.redirects.delete',
+            'risk_tier' => 'destructive',
+            'status' => 'applied',
+            'proposal_id' => 'abc-123',
+            'input' => json_encode(['id' => 1]),
+            'output' => json_encode(['deleted' => true]),
+            'scope' => null,
+            'actor' => json_encode(['transport' => 'mcp']),
+            'created_at' => now(),
+            'applied_at' => now(),
+        ]);
+
+        $this->get('/seo/panel/ai-tool-calls')
+            ->assertOk()
+            ->assertSee('seo.redirects.delete')
+            ->assertSee('destructive')
+            ->assertSee('Đã áp dụng');
+    }
+
     public function test_fixed_segment_routes_are_not_swallowed_by_the_type_id_catch_all(): void
     {
         $this->get('/seo/panel/audit-history')->assertOk();
         $this->get('/seo/panel/internal-links')->assertOk();
         $this->get('/seo/panel/search-console')->assertOk();
         $this->get('/seo/panel/indexnow-log')->assertOk();
+        $this->get('/seo/panel/ai-tool-calls')->assertOk();
     }
 }

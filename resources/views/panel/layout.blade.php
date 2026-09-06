@@ -180,6 +180,7 @@
                     'seo.panel.internal-links' => 'Liên kết nội bộ',
                     'seo.panel.search-console' => 'Search Console',
                     'seo.panel.indexnow-log' => 'IndexNow',
+                    'seo.panel.ai-tool-calls' => 'Hoạt động AI',
                     'seo.panel.settings' => 'Cấu hình',
                 ];
             @endphp

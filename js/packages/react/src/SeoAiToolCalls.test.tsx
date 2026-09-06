@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { act, create } from 'react-test-renderer'
-import type { ContentListResponse, SeoClient } from '@duxbo/seo-core'
-import { SeoContentList } from './SeoContentList.js'
+import type { AiToolCallsResponse, SeoClient } from '@duxbo/seo-core'
+import { SeoAiToolCalls } from './SeoAiToolCalls.js'
 
-function stubClient(content: (type?: string, page?: number) => Promise<ContentListResponse>): SeoClient {
+function stubClient(aiToolCalls: () => Promise<AiToolCallsResponse>): SeoClient {
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async () => ({ score: 0, locale: null, results: [] }),
@@ -25,7 +25,7 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
       sitemapSources: 0,
       exposedTypes: [],
     }),
-    content,
+    content: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
     settings: async () => ({
       seoEnabled: true,
       indexableEnvironments: [],
@@ -52,63 +52,76 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
     searchConsoleStats: async () => ({ days: 30, totalClicks: 0, totalImpressions: 0, data: [] }),
     indexNowLog: async () => ({ data: [] }),
     aiTools: async () => ({ tools: [] }),
-    aiToolCalls: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
+    aiToolCalls,
   }
 }
 
-test('shows an untitled record with the fallback pill rather than a blank cell', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 1, title: null, description: null, robots: null, url: '/trong' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
+test('shows the empty state with no tool calls', async () => {
+  const client = stubClient(async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }))
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
+    renderer = create(<SeoAiToolCalls client={client} />)
   })
 
-  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Chưa có tiêu đề'))
+  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Chưa có lần gọi tool AI'))
 })
 
-test('onEdit receives the row type and id', async () => {
+test('renders a call with its tool name, risk tier and status', async () => {
   const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 42, title: 'Bài viết', description: null, robots: null, url: '/bai-viet' }],
+    data: [
+      {
+        id: 1,
+        tool: 'seo.redirects.delete',
+        riskTier: 'destructive',
+        status: 'applied',
+        proposalId: 'abc-123',
+        input: { id: 1 },
+        output: { deleted: true },
+        scope: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        appliedAt: '2026-01-01T00:00:05Z',
+      },
+    ],
     meta: { currentPage: 1, lastPage: 1, total: 1 },
   }))
 
-  const edits: [string, string | number][] = []
   let renderer: ReturnType<typeof create>
-
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" onEdit={(t, id) => edits.push([t, id])} />)
+    renderer = create(<SeoAiToolCalls client={client} />)
   })
 
-  const button = renderer!.root.findByProps({ children: 'Sửa' })
-
-  act(() => {
-    button.props.onClick()
-  })
-
-  assert.deepEqual(edits, [['post', 42]])
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('seo.redirects.delete'))
+  assert.ok(json.includes('destructive'))
+  assert.ok(json.includes('Đã áp dụng'))
 })
 
-test('paging past the last page is disabled', async () => {
+test('shows a proposed call as pending, not applied', async () => {
   const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 1, title: 'x', description: null, robots: null, url: '/x' }],
+    data: [
+      {
+        id: 1,
+        tool: 'seo.settings.set',
+        riskTier: 'write',
+        status: 'proposed',
+        proposalId: 'abc-123',
+        input: { key: 'verification.google', value: 'x' },
+        output: null,
+        scope: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        appliedAt: null,
+      },
+    ],
     meta: { currentPage: 1, lastPage: 1, total: 1 },
   }))
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
+    renderer = create(<SeoAiToolCalls client={client} />)
   })
 
-  // A single page renders no pager at all.
-  assert.equal(renderer!.root.findAllByProps({ children: 'Sau →' }).length, 0)
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('Đã đề xuất'))
+  assert.ok(!json.includes('Đã áp dụng'))
 })

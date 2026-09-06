@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Duxbo\Seo\Http\Api\V1\AiToolCallsController;
 use Duxbo\Seo\Http\Api\V1\AiToolsController;
 use Duxbo\Seo\Http\Api\V1\AnalyzeController;
 use Duxbo\Seo\Http\Api\V1\AuditHistoryController;
@@ -92,6 +93,7 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
         // this whole group's viewSeoPanel.
         Route::get('ai/tools', [AiToolsController::class, 'index']);
         Route::post('ai/tools/{name}/call', [AiToolsController::class, 'call'])->where('name', '[a-z0-9_.]+');
+        Route::get('ai/tool-calls', [AiToolCallsController::class, 'index']);
 
         // The MCP (Model Context Protocol) endpoint — the same tool
         // registry, spoken as JSON-RPC 2.0 so Claude Code, Claude Desktop

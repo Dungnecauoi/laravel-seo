@@ -51,6 +51,8 @@ function stubClient(searchConsoleStats: (days?: number) => Promise<SearchConsole
     internalLinks: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
     searchConsoleStats,
     indexNowLog: async () => ({ data: [] }),
+    aiTools: async () => ({ tools: [] }),
+    aiToolCalls: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
   }
 }
 

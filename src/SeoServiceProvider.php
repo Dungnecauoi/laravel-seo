@@ -7,6 +7,7 @@ namespace Duxbo\Seo;
 use Closure;
 use Duxbo\Seo\Analysis\Analyzer;
 use Duxbo\Seo\Analysis\DomContentExtractor;
+use Duxbo\Seo\Console\AiToolsCommand;
 use Duxbo\Seo\Console\AuditCommand;
 use Duxbo\Seo\Console\DuplicatesCommand;
 use Duxbo\Seo\Console\HreflangAuditCommand;
@@ -168,6 +169,7 @@ final class SeoServiceProvider extends ServiceProvider
                 AuditCommand::class,
                 InternalLinksCommand::class,
                 SearchConsoleSyncCommand::class,
+                AiToolsCommand::class,
             ]);
         }
     }

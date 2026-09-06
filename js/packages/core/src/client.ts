@@ -1,5 +1,7 @@
 import { SeoApiError, SeoTimeoutError } from './errors.js'
 import type {
+  AiToolCallsResponse,
+  AiToolManifestResponse,
   AnalysisReport,
   AuditHistoryResponse,
   ContentListResponse,
@@ -55,6 +57,11 @@ export interface SeoClient {
   searchConsoleStats(days?: number): Promise<SearchConsoleStatsResponse>
   /** Recent IndexNow submissions, newest first. */
   indexNowLog(limit?: number): Promise<IndexNowLogResponse>
+
+  /** Every capability of this package an AI agent can discover and call. */
+  aiTools(): Promise<AiToolManifestResponse>
+  /** Every AI tool call, propose and apply alike, newest first. */
+  aiToolCalls(page?: number): Promise<AiToolCallsResponse>
 }
 
 export interface AnalyzeInput {
@@ -252,6 +259,14 @@ export function createSeoClient(options: SeoClientOptions): SeoClient {
 
     indexNowLog(limit) {
       return request(`indexnow/log${query({ limit })}`)
+    },
+
+    aiTools() {
+      return request('ai/tools')
+    },
+
+    aiToolCalls(page) {
+      return request(`ai/tool-calls${query({ page })}`)
     },
   }
 }

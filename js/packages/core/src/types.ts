@@ -251,6 +251,40 @@ export interface IndexNowLogResponse {
   data: IndexNowLogEntry[]
 }
 
+/** One AI tool call, propose and apply alike — from `seo_ai_tool_calls`. */
+export interface AiToolCallEntry {
+  id: number
+  tool: string
+  riskTier: 'read' | 'write' | 'destructive'
+  status: 'proposed' | 'applied'
+  proposalId: string | null
+  input: Record<string, unknown>
+  output: Record<string, unknown> | null
+  scope: string | null
+  createdAt: string | null
+  appliedAt: string | null
+}
+
+export interface AiToolCallsResponse {
+  data: AiToolCallEntry[]
+  meta: PageMeta
+}
+
+/** One entry in the AI tool manifest — {@see AiToolCallsResponse} is the log of calls, this is what can be called. */
+export interface AiToolManifestEntry {
+  name: string
+  description: string
+  /** Anthropic tool-use shape. */
+  input_schema: Record<string, unknown>
+  /** OpenAI function-calling shape — identical schema, different key. */
+  parameters: Record<string, unknown>
+  risk_tier: 'read' | 'write' | 'destructive'
+}
+
+export interface AiToolManifestResponse {
+  tools: AiToolManifestEntry[]
+}
+
 export interface SeoClientOptions {
   /** Origin of the Laravel application, without a trailing slash. */
   baseUrl: string

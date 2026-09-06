@@ -7,6 +7,10 @@ export type { MetaStore, MetaStoreOptions, MetaStoreTarget } from './store.js'
 export { SeoApiError, SeoTimeoutError } from './errors.js'
 
 export type {
+  AiToolCallEntry,
+  AiToolCallsResponse,
+  AiToolManifestEntry,
+  AiToolManifestResponse,
   AnalysisReport,
   AuditBatchEntry,
   AuditHistoryResponse,

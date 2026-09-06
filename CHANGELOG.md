@@ -11,6 +11,32 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Added — visibility into AI activity: a panel page, a REST endpoint, UI components, a debug command
+
+Closes out the AI tool registry work with the read-only visibility layer
+promised alongside it — nothing here can mutate anything, it only shows
+what the last four phases already built:
+
+- **`GET /api/seo/v1/ai/tool-calls`** and its Blade panel twin at
+  `/seo/panel/ai-tool-calls` — every propose and apply from
+  `seo_ai_tool_calls`, newest first, same pagination shape as audit history
+  and internal links.
+- **`<SeoAiToolCalls>`** in both `@duxbo/seo-react` and `@duxbo/seo-vue` —
+  the same read, for a project building its own admin surface instead of
+  the Blade one. `@duxbo/seo-core`'s `SeoClient` gained `aiToolCalls()` and
+  `aiTools()` (the manifest, for a UI that wants to show what an agent
+  *could* call, not just what it already did).
+- **`php artisan seo:ai:tools`** — lists every tool `AiToolRegistry` holds
+  with its risk tier and description, for checking what an agent can see
+  without making an HTTP or MCP call to find out.
+
+Deliberately out of scope here: confirming a pending AI proposal *from* the
+panel. That is a different, larger feature — a human reviewing and
+approving an AI's proposed action — not a polish item on top of the
+registry, and would need its own design pass (proposal expiry in the UI,
+who is allowed to confirm what, an audit trail distinct from the AI's own).
+This phase only makes what already happened visible.
+
 ### Added — grounded AI suggestions, meta tools, and a circuit breaker
 
 Rounds out the tool registry (still no console-command wrapping — see the

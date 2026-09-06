@@ -30,7 +30,14 @@ export type { SeoSearchConsoleStatsProps } from './SeoSearchConsoleStats.js'
 export { SeoIndexNowLog } from './SeoIndexNowLog.js'
 export type { SeoIndexNowLogProps } from './SeoIndexNowLog.js'
 
+export { SeoAiToolCalls } from './SeoAiToolCalls.js'
+export type { SeoAiToolCallsProps } from './SeoAiToolCalls.js'
+
 export type {
+  AiToolCallEntry,
+  AiToolCallsResponse,
+  AiToolManifestEntry,
+  AiToolManifestResponse,
   AnalysisReport,
   AuditBatchEntry,
   AuditHistoryResponse,

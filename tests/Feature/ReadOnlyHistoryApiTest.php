@@ -54,6 +54,7 @@ final class ReadOnlyHistoryApiTest extends TestCase
         $this->getJson('/api/seo/v1/internal-links')->assertForbidden();
         $this->getJson('/api/seo/v1/search-console/stats')->assertForbidden();
         $this->getJson('/api/seo/v1/indexnow/log')->assertForbidden();
+        $this->getJson('/api/seo/v1/ai/tool-calls')->assertForbidden();
     }
 
     public function test_audit_history_lists_batches_newest_first(): void
@@ -133,5 +134,30 @@ final class ReadOnlyHistoryApiTest extends TestCase
         $this->assertFalse($data[0]['successful']);
         $this->assertSame('Forbidden', $data[0]['error']);
         $this->assertTrue($data[1]['successful']);
+    }
+
+    public function test_ai_tool_calls_lists_propose_and_apply_rows_newest_first(): void
+    {
+        DB::table('seo_ai_tool_calls')->insert([
+            [
+                'tool' => 'seo.redirects.create', 'risk_tier' => 'write', 'status' => 'proposed',
+                'proposal_id' => 'abc', 'input' => json_encode(['source' => '/a']), 'output' => null,
+                'scope' => null, 'actor' => json_encode(['transport' => 'rest']),
+                'created_at' => now()->subMinute(), 'applied_at' => null,
+            ],
+            [
+                'tool' => 'seo.redirects.create', 'risk_tier' => 'write', 'status' => 'applied',
+                'proposal_id' => 'abc', 'input' => json_encode(['source' => '/a']), 'output' => json_encode(['id' => 1]),
+                'scope' => null, 'actor' => json_encode(['transport' => 'rest']),
+                'created_at' => now(), 'applied_at' => now(),
+            ],
+        ]);
+
+        $data = $this->getJson('/api/seo/v1/ai/tool-calls')->assertOk()->json('data');
+
+        $this->assertSame('applied', $data[0]['status']);
+        $this->assertSame(['id' => 1], $data[0]['output']);
+        $this->assertSame('proposed', $data[1]['status']);
+        $this->assertNull($data[1]['output']);
     }
 }
