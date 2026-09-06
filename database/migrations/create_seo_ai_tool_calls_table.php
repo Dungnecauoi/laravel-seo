@@ -28,6 +28,12 @@ return new class extends Migration
             $table->json('input');
             $table->json('output')->nullable();
 
+            // The human-readable line AiToolDispatcher::propose() already
+            // computes via AiToolPreviewable — kept alongside the row so a
+            // reviewer (the panel's pending-proposals list) has something
+            // better to read than the raw input JSON.
+            $table->text('preview')->nullable();
+
             $table->string('scope', 191)->nullable();
             $table->json('actor')->nullable();
 

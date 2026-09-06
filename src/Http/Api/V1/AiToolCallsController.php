@@ -27,6 +27,7 @@ final class AiToolCallsController extends ApiController
             'proposalId' => $row->proposal_id,
             'input' => json_decode((string) $row->input, true) ?? [],
             'output' => $row->output !== null ? json_decode((string) $row->output, true) : null,
+            'preview' => $row->preview,
             'scope' => $row->scope,
             'createdAt' => $row->created_at,
             'appliedAt' => $row->applied_at,

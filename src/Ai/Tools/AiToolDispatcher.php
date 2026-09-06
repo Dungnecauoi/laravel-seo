@@ -84,7 +84,7 @@ final class AiToolDispatcher
             (int) $this->config->get('seo.ai.tools.proposal_ttl', 900),
         );
 
-        $this->record($tool, $input, $context, 'proposed', $proposalId);
+        $this->record($tool, $input, $context, 'proposed', $proposalId, preview: $preview);
 
         return AiToolResult::proposed($proposalId, $preview);
     }
@@ -123,6 +123,7 @@ final class AiToolDispatcher
         string $status,
         string $proposalId,
         ?array $output = null,
+        ?string $preview = null,
     ): void {
         if ($this->config->get('seo.ai.tools.log', true) !== true) {
             return;
@@ -135,6 +136,7 @@ final class AiToolDispatcher
             'proposal_id' => $proposalId,
             'input' => json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             'output' => $output !== null ? json_encode($output, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            'preview' => $preview,
             'scope' => $context->scope,
             'actor' => json_encode(['transport' => $context->transport], JSON_UNESCAPED_UNICODE),
             'created_at' => now(),

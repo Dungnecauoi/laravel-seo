@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 use Duxbo\Seo\Ai\Tools\Analysis\SuggestContentFixesTool;
 use Duxbo\Seo\Ai\Tools\Audit\AuditHistoryTool;
+use Duxbo\Seo\Ai\Tools\Console\RunAuditCommandTool;
+use Duxbo\Seo\Ai\Tools\Console\RunDuplicatesCommandTool;
+use Duxbo\Seo\Ai\Tools\Console\RunHreflangAuditCommandTool;
+use Duxbo\Seo\Ai\Tools\Console\RunInternalLinksCommandTool;
+use Duxbo\Seo\Ai\Tools\Console\RunSearchConsoleSyncCommandTool;
+use Duxbo\Seo\Ai\Tools\Console\RunSitemapCommandTool;
 use Duxbo\Seo\Ai\Tools\Dashboard\DashboardSummaryTool;
 use Duxbo\Seo\Ai\Tools\IndexNow\SubmitUrlsTool;
 use Duxbo\Seo\Ai\Tools\InternalLinks\ListInternalLinksTool;
@@ -776,6 +782,8 @@ return [
                 SuggestContentFixesTool::class,
                 SuggestRedirectTargetTool::class,
                 SuggestInternalLinkFixesTool::class,
+                RunDuplicatesCommandTool::class,
+                RunHreflangAuditCommandTool::class,
 
                 // Write
                 CreateRedirectTool::class,
@@ -783,6 +791,10 @@ return [
                 ConvertNotFoundToRedirectTool::class,
                 SetSettingTool::class,
                 ApplyMetaTool::class,
+                RunAuditCommandTool::class,
+                RunInternalLinksCommandTool::class,
+                RunSitemapCommandTool::class,
+                RunSearchConsoleSyncCommandTool::class,
 
                 // Destructive
                 DeleteRedirectTool::class,

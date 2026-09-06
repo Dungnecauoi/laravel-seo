@@ -260,6 +260,7 @@ export interface AiToolCallEntry {
   proposalId: string | null
   input: Record<string, unknown>
   output: Record<string, unknown> | null
+  preview: string | null
   scope: string | null
   createdAt: string | null
   appliedAt: string | null

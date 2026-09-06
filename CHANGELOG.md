@@ -11,6 +11,35 @@ production site, and that is the only thing that turns a well-built package
 into a hardened one — the edge cases that matter are the ones real projects
 find. `Contracts/` is frozen at 1.0, so it stays open until then.
 
+### Added — a human confirms an AI proposal from the panel; console commands become AI tools
+
+The two items the previous phase deliberately deferred:
+
+- **Confirming a pending AI proposal from the Blade panel.** The "Hoạt động
+  AI" page now shows proposals still inside their `proposal_ttl` window with
+  no matching `applied` row, each with a "Xác nhận" button — a human
+  reviewing and approving an AI's proposed action before it runs, the "human
+  in the loop" MCP's own spec asks every client integration to provide.
+  Confirming goes through the exact same `AiToolDispatcher::call()` every
+  other caller does, built from *that request's own* signed-in user — it is
+  not a bypass of `useSeoAiWrites`/`useSeoAiDestructive`. If those Gates
+  still deny this user, confirming from the panel is refused exactly like
+  confirming from an API or MCP call would be, with a friendly message
+  instead of a 500. `AiToolDispatcher::propose()` now stores the preview
+  text it already computes in a new `preview` column (added to the
+  still-unreleased `seo_ai_tool_calls` table directly, not a follow-up
+  migration — nothing has run this schema in production yet), since a
+  reviewer needs something better to read than the raw `input` JSON.
+- **Six console commands as AI tools**, honestly shaped: `Artisan::call()`
+  only ever returns an exit code and whatever it printed, so
+  `seo.console.audit`, `.internal_links`, `.sitemap`, `.search_console_sync`
+  (Write), `.duplicates`, `.hreflang` (Read) return `{exitCode, output}`
+  rather than a structured shape pretending to be richer than a terminal
+  command actually is. `seo:indexnow` and `seo:prune-404` are deliberately
+  not wrapped this way — `seo.indexnow.submit` and `seo.not_found.prune`
+  already cover them with real structured output and a proper dry-run
+  preview, which a console wrapper cannot offer.
+
 ### Added — visibility into AI activity: a panel page, a REST endpoint, UI components, a debug command
 
 Closes out the AI tool registry work with the read-only visibility layer

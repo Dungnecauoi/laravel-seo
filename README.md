@@ -563,16 +563,25 @@ default) require a propose-then-confirm round trip — the first call returns
 a proposal id and a preview with nothing mutated, the second must name that
 id to actually run, replaying the input captured at propose time rather than
 whatever the confirming call sends. Every propose and apply is logged to
-`seo_ai_tool_calls`. Eleven read-only tools — the seven plain reads
-(`seo.meta.get`, `seo.redirects.list`, `seo.not_found.list`,
+`seo_ai_tool_calls`. Twenty-seven tools in all: thirteen read-only — seven
+plain reads (`seo.meta.get`, `seo.redirects.list`, `seo.not_found.list`,
 `seo.dashboard.summary`, `seo.audit.history`, `seo.internal_links.list`,
-`seo.settings.get`) plus four AI suggestions grounded in real data
+`seo.settings.get`), four AI suggestions grounded in real data
 (`seo.meta.suggest`, `seo.analysis.suggest_fixes`,
-`seo.not_found.suggest_redirect_target`, `seo.internal_links.suggest_fixes`)
-— plus ten that write or delete (`seo.meta.apply`/`.delete`,
-`seo.redirects.create`/`.toggle`/`.delete`,
-`seo.not_found.prune`/`.convert_to_redirect`, `seo.settings.set`/`.clear`,
-`seo.indexnow.submit`).
+`seo.not_found.suggest_redirect_target`, `seo.internal_links.suggest_fixes`),
+two console-command reports (`seo.console.duplicates`, `.hreflang`) — nine
+that write (`seo.meta.apply`, `seo.redirects.create`/`.toggle`,
+`seo.not_found.convert_to_redirect`, `seo.settings.set`, plus four more
+console commands: `seo.console.audit`/`.internal_links`/`.sitemap`/
+`.search_console_sync`), and five that delete or otherwise cannot be undone
+(`seo.meta.delete`, `seo.redirects.delete`, `seo.not_found.prune`,
+`seo.settings.clear`, `seo.indexnow.submit`). The six `seo.console.*` tools
+wrap an Artisan command directly — `Artisan::call()` only ever returns an
+exit code and whatever it printed, so they return `{exitCode, output}`
+rather than a shape pretending to be richer than a terminal command
+actually is; `seo:indexnow` and `seo:prune-404` are deliberately not
+wrapped this way since the dedicated tools above already cover them with
+real structured output.
 
 Two ways an external agent reaches the same registry, no PHP required:
 
@@ -599,10 +608,16 @@ directly: every propose and apply, newest first. `<SeoAiToolCalls>` in
 `@duxbo/seo-react`/`-vue` is the same list for a project building its own
 admin surface. `php artisan seo:ai:tools` lists every registered tool with
 its risk tier, for checking what an agent can see without making a call to
-find out. None of this can confirm a pending proposal from the panel —
-that is a distinct, larger feature (a human approving an AI's action) this
-phase deliberately leaves for later, not a polish item on top of the
-registry.
+find out.
+
+**A human confirms a pending proposal from the panel** — the "Hoạt động AI"
+page also lists proposals still inside their `proposal_ttl` window with no
+matching applied row, each with a "Xác nhận" button. Confirming goes through
+the exact same `AiToolDispatcher::call()` any other caller does, built from
+that request's own signed-in user — not a bypass of
+`useSeoAiWrites`/`useSeoAiDestructive`. If those Gates still deny this user,
+confirming from the panel is refused exactly like confirming from an API or
+MCP call would be.
 
 ### The npm client
 

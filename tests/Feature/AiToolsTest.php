@@ -553,6 +553,32 @@ final class AiToolsTest extends TestCase
         $this->assertSame($related->seoUrl(), $result->data['suggestions'][0]['sourceUrl']);
     }
 
+    public function test_console_duplicates_tool_runs_immediately_and_returns_the_output(): void
+    {
+        $result = $this->dispatcher()->call('seo.console.duplicates', ['model' => Post::class], new AiToolContext());
+
+        $this->assertSame(AiToolResultStatus::Ok, $result->status);
+        $this->assertSame(0, $result->data['exitCode']);
+        $this->assertStringContainsString('No duplicate resolved title', $result->data['output']);
+    }
+
+    public function test_console_audit_tool_only_creates_a_batch_after_confirming(): void
+    {
+        $context = new AiToolContext();
+
+        $proposed = $this->dispatcher()->call('seo.console.audit', ['model' => Post::class], $context);
+
+        $this->assertSame(AiToolResultStatus::Proposed, $proposed->status);
+        $this->assertStringContainsString('seo:audit', (string) $proposed->preview);
+        $this->assertSame(0, AuditBatch::query()->count());
+
+        $applied = $this->dispatcher()->call('seo.console.audit', [], $context, confirm: $proposed->proposalId);
+
+        $this->assertSame(AiToolResultStatus::Applied, $applied->status);
+        $this->assertSame(0, $applied->data['exitCode']);
+        $this->assertSame(1, AuditBatch::query()->count());
+    }
+
     /**
      * @param  array<string, mixed>  $input
      */

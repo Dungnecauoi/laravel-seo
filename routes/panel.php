@@ -63,7 +63,12 @@ Route::prefix(config('seo.panel.prefix', 'seo/panel'))
         Route::get('internal-links', InternalLinksController::class)->name('internal-links');
         Route::get('search-console', SearchConsoleStatsController::class)->name('search-console');
         Route::get('indexnow-log', IndexNowLogController::class)->name('indexnow-log');
-        Route::get('ai-tool-calls', AiToolCallsController::class)->name('ai-tool-calls');
+        Route::prefix('ai-tool-calls')->name('ai-tool-calls.')->group(static function (): void {
+            Route::get('/', [AiToolCallsController::class, 'index'])->name('index');
+            Route::post('{proposalId}/confirm', [AiToolCallsController::class, 'confirm'])
+                ->whereUuid('proposalId')
+                ->name('confirm');
+        });
 
         Route::get('{type}/{id}', [PanelController::class, 'show'])->name('show');
         Route::get('{type}/{id}/data', [PanelController::class, 'data'])->name('data');
