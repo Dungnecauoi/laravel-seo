@@ -4,7 +4,9 @@ Notable changes, newest first. This project follows [semantic versioning](https:
 with one addition: **everything in `src/Contracts` is the public API**, and it
 only changes in a major release. The rest of `src/` is free to be refactored.
 
-## Unreleased — 0.9.0
+## Unreleased
+
+## 0.9.0 — 2026-09-07
 
 Feature-complete and fully tested, but not yet 1.0. Nothing here has run in a
 production site, and that is the only thing that turns a well-built package

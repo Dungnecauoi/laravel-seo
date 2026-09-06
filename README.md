@@ -839,6 +839,29 @@ composer install
 vendor/bin/phpunit
 ```
 
+## Releasing
+
+`duxbo/laravel-ai-core` is required through a local `path` repository
+(`../ai-core`) so both packages can be developed side by side. A path
+repository reads its version from the dependency's own `composer.json`
+`"version"` field, not from its git tags — so bumping `ai-core`'s version
+means editing *its* `composer.json`, not this one, then re-running
+`composer update duxbo/laravel-ai-core` here to pick it up.
+
+For this package itself: move the current `CHANGELOG.md` entry from
+`## Unreleased` to a dated `## x.y.z — YYYY-MM-DD` heading, update
+`extra.branch-alias`'s `dev-main` to the next unreleased version, then tag:
+
+```bash
+git tag -a vX.Y.Z -m "X.Y.Z - <one-line summary>"
+git push origin main && git push origin vX.Y.Z
+```
+
+Patch for a fix, minor for a backward-compatible feature, major only for a
+`Contracts/` break (frozen entirely until 1.0, per the note at the top of
+`CHANGELOG.md`) — so a project needing a feature added after it installed
+can require `^X.Y` and get it without touching anything else.
+
 ## Licence
 
 MIT.

@@ -23,7 +23,7 @@
         "ext-libxml": "*",
         "ext-mbstring": "*",
         "ext-xmlwriter": "*",
-        "duxbo/laravel-ai-core": "dev-main",
+        "duxbo/laravel-ai-core": "^0.1",
         "illuminate/support": "^11.0|^12.0|^13.0",
         "illuminate/database": "^11.0|^12.0|^13.0",
         "illuminate/http": "^11.0|^12.0|^13.0",
@@ -63,7 +63,7 @@
             }
         },
         "branch-alias": {
-            "dev-main": "1.x-dev"
+            "dev-main": "0.9.x-dev"
         }
     },
     "config": {
