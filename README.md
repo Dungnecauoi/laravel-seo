@@ -12,7 +12,7 @@ stops maintaining.
 
 ## Status
 
-Feature-complete at **0.9**, and not yet 1.0 on purpose: nothing here has run in
+Feature-complete at **0.10**, and not yet 1.0 on purpose: nothing here has run in
 a production site, and that is the only thing that turns a well-built package
 into a hardened one. `Contracts/` stays open until it has.
 
@@ -320,6 +320,18 @@ record's actual body content, and only the application knows which attribute
 holds that — `--content` names it, the same way `seo.models.*.route` exists
 for URLs rather than this package guessing a column name. Schedule it
 yourself with Laravel's own scheduler if a project wants it to run nightly.
+
+Content score is the only number this command computes itself — it also
+joins in PageSpeed, indexing status and broken-link count from whatever
+`seo:pagespeed` / `seo:search-console:inspect` / `seo:broken-links` last
+stored for each record's own URL, never a live call of its own: a batch
+over every record of a model would blow through Google's own rate limits
+on those two APIs almost immediately. `average_pagespeed_score`,
+`records_not_indexed` and `records_with_broken_links` on the batch, and
+`pagespeed_score`/`gsc_verdict`/`broken_links_count` on each record's own
+row, are `null` rather than `0` when nothing has ever checked that URL —
+"no data yet" and "checked, all good" are not the same claim, so audit
+history never conflates them.
 
 ### Internal links
 

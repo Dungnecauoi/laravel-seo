@@ -6,6 +6,78 @@ only changes in a major release. The rest of `src/` is free to be refactored.
 
 ## Unreleased
 
+## 0.10.0 — 2026-09-09
+
+Fills the gaps between this package and a paid all-in-one SEO suite,
+following the same headless shape every existing integration already has:
+a client class, a console command, an AI tool behind its risk tier, a REST
+endpoint, a Blade panel page, and a TypeScript SDK client method plus
+React/Vue component.
+
+### Added — Google Indexing, PageSpeed, and Search Console URL Inspection
+
+- **`GoogleIndexingClient`** (`php artisan seo:google-indexing`,
+  `seo.google_indexing.submit`) — signs its own JWT (RS256, via
+  `openssl_sign`, no SDK) and exchanges it for an access token from a
+  service account, mirroring how `SearchConsoleClient` never runs the OAuth
+  consent flow itself. Google only documents the Indexing API for
+  JobPosting/BroadcastEvent, but the endpoint accepts any URL; this package
+  does not gate submission by content type, the same reasoning
+  `IndexNowSubmitter` already applies.
+- **`PageSpeedClient`** (`php artisan seo:pagespeed`, `seo.pagespeed.check`)
+  — a plain API key (no OAuth needed for a public read-only API), separating
+  lab data (always present) from field data (real Chrome UX Report
+  visitors, only present once a URL has enough traffic).
+- **`SearchConsoleClient::inspectUrl()`/`inspect()`**
+  (`php artisan seo:search-console:inspect`, `seo.search_console.inspect`)
+  — the URL Inspection API, reusing the same OAuth refresh-token flow the
+  existing performance sync already has. Explicit URLs only: Google
+  rate-limits this endpoint far tighter than search analytics
+  (~2,000/day/site).
+
+### Added — broken external link checking
+
+`BrokenLinkChecker` (`php artisan seo:broken-links`,
+`seo.broken_links.list`/`.console.broken_links`) crawls a model's external
+links and checks each distinct URL once, split into `seo_external_links`
+(who cites what) and `seo_link_checks` (is it still good) so the same URL
+cited from fifty records is checked once, not fifty times. Every request —
+including each redirect hop — is validated by a new `PublicUrlGuard` first,
+rejecting literal private/loopback/link-local/reserved addresses and any
+hostname that resolves to one: without it, a URL parsed out of a model's
+own content (not trusted the way an operator's CLI arguments are) could
+point at a cloud metadata endpoint or an internal service, turning a
+scheduled crawl into an SSRF probe of the server's own network.
+
+### Added — image sitemaps, tracking scripts, and AI alt-text suggestions
+
+- **`HasSitemapImages`** — `<image:image>` support already existed in
+  `SitemapWriter`, but nothing populated it for a real model;
+  `ModelSource` now checks for this contract the same way it already does
+  for `HasSitemapVideo`.
+- **`Seo::trackingHead()`/`trackingBodyOpen()`**,
+  `@seoTrackingHead`/`@seoTrackingBody` — a trusted, unparsed pass-through
+  for GA4/GTM/Meta Pixel/TikTok Pixel snippets. Not SEO, but expected by
+  agencies comparing this to Yoast/RankMath; both keys ride the existing
+  dynamic-settings mechanism for free.
+- **`SeoAiManager::suggestAltText()`** (`seo.analysis.suggest_alt_text`) —
+  the one deliberately unlike every other AI suggestion here: nothing in
+  the AI pipeline is multi-modal, so it infers alt text from a page's own
+  content and each image's file name, never from what the image actually
+  shows. The prompt says so outright. Propose-only, no apply tool, the
+  same reason `suggestInternalLinkFixes()` has none: alt text lives inside
+  a model's own body content.
+
+### Changed — `seo:audit` now reports PageSpeed, indexing status, and broken links
+
+Content score is still the only number the command computes itself — it
+now also joins in PageSpeed, indexing status and broken-link count from
+whatever the three features above last stored for each record's own URL,
+never a live call of its own (a batch over every record of a model would
+blow through Google's rate limits almost immediately). `null` rather than
+`0` when nothing has ever checked that URL, so "no data yet" and "checked,
+all good" are never conflated.
+
 ## 0.9.0 — 2026-09-07
 
 Feature-complete and fully tested, but not yet 1.0. Nothing here has run in a
