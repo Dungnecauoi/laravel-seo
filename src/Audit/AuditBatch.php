@@ -18,6 +18,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property float|null $average_score
  * @property int|null $min_score
  * @property int|null $max_score
+ * @property float|null $average_pagespeed_score
+ * @property int|null $records_not_indexed
+ * @property int|null $records_with_broken_links
  * @property \Illuminate\Support\Carbon $started_at
  * @property \Illuminate\Support\Carbon|null $finished_at
  */
@@ -34,6 +37,7 @@ final class AuditBatch extends Model
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'average_score' => 'float',
+        'average_pagespeed_score' => 'float',
     ];
 
     public function getTable(): string

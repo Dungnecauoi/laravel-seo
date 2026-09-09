@@ -82,6 +82,9 @@ test('renders a batch with its average score and record count', async () => {
         averageScore: 72.5,
         minScore: 40,
         maxScore: 90,
+        averagePagespeedScore: 88.3,
+        recordsNotIndexed: 2,
+        recordsWithBrokenLinks: 0,
         startedAt: '2026-01-01T00:00:00Z',
         finishedAt: '2026-01-01T00:01:00Z',
       },
@@ -98,6 +101,40 @@ test('renders a batch with its average score and record count', async () => {
   assert.ok(json.includes('Post'))
   assert.ok(json.includes('72.5'))
   assert.ok(json.includes('12'))
+  assert.ok(json.includes('88.3'))
+})
+
+test('a signal that was never checked shows a dash, not a misleading zero', async () => {
+  const client = stubClient(async () => ({
+    data: [
+      {
+        id: 1,
+        model: 'App\\Models\\Post',
+        locale: null,
+        totalRecords: 5,
+        averageScore: 80,
+        minScore: 70,
+        maxScore: 90,
+        averagePagespeedScore: null,
+        recordsNotIndexed: null,
+        recordsWithBrokenLinks: null,
+        startedAt: null,
+        finishedAt: null,
+      },
+    ],
+    meta: { currentPage: 1, lastPage: 1, total: 1 },
+  }))
+
+  let renderer: ReturnType<typeof create>
+  await act(async () => {
+    renderer = create(<SeoAuditHistory client={client} />)
+  })
+
+  const json = JSON.stringify(renderer!.toJSON())
+  // Every "never checked" column renders its own dash — a bare digit "0"
+  // must not appear anywhere, since that would misreport "checked, all
+  // good" instead of "no data".
+  assert.ok(!json.includes('"0"'))
 })
 
 test('passes the model filter through to the client', async () => {

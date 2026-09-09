@@ -34,6 +34,9 @@ final class AuditHistoryController extends ApiController
             'averageScore' => $batch->average_score,
             'minScore' => $batch->min_score,
             'maxScore' => $batch->max_score,
+            'averagePagespeedScore' => $batch->average_pagespeed_score,
+            'recordsNotIndexed' => $batch->records_not_indexed,
+            'recordsWithBrokenLinks' => $batch->records_with_broken_links,
             'startedAt' => optional($batch->started_at)->toIso8601String(),
             'finishedAt' => optional($batch->finished_at)->toIso8601String(),
         ], $paginator->items());

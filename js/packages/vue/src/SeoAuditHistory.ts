@@ -44,6 +44,9 @@ export const SeoAuditHistory = defineComponent({
               h('th', { class: 'px-3 py-2 font-medium' }, 'Số bản ghi'),
               h('th', { class: 'px-3 py-2 font-medium' }, 'Điểm TB'),
               h('th', { class: 'px-3 py-2 font-medium' }, 'Thấp / Cao'),
+              h('th', { class: 'px-3 py-2 font-medium' }, 'PageSpeed TB'),
+              h('th', { class: 'px-3 py-2 font-medium' }, 'Chưa index'),
+              h('th', { class: 'px-3 py-2 font-medium' }, 'Link chết'),
               h('th', { class: 'px-3 py-2 font-medium' }, 'Chạy lúc'),
             ]),
           ]),
@@ -76,6 +79,43 @@ export const SeoAuditHistory = defineComponent({
                   'td',
                   { class: 'px-3 py-2 text-slate-500' },
                   `${batch.minScore ?? '—'} / ${batch.maxScore ?? '—'}`,
+                ),
+                h(
+                  'td',
+                  { class: 'px-3 py-2 text-slate-500' },
+                  batch.averagePagespeedScore !== null ? batch.averagePagespeedScore.toFixed(1) : '—',
+                ),
+                h(
+                  'td',
+                  { class: 'px-3 py-2' },
+                  batch.recordsNotIndexed === null
+                    ? h('span', { class: 'text-slate-400' }, '—')
+                    : h(
+                        'span',
+                        {
+                          class:
+                            batch.recordsNotIndexed > 0
+                              ? 'rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700'
+                              : 'rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700',
+                        },
+                        String(batch.recordsNotIndexed),
+                      ),
+                ),
+                h(
+                  'td',
+                  { class: 'px-3 py-2' },
+                  batch.recordsWithBrokenLinks === null
+                    ? h('span', { class: 'text-slate-400' }, '—')
+                    : h(
+                        'span',
+                        {
+                          class:
+                            batch.recordsWithBrokenLinks > 0
+                              ? 'rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700'
+                              : 'rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700',
+                        },
+                        String(batch.recordsWithBrokenLinks),
+                      ),
                 ),
                 h(
                   'td',

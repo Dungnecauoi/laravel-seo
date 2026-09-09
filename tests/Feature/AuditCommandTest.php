@@ -9,6 +9,7 @@ use Duxbo\Seo\Audit\AuditBatch;
 use Duxbo\Seo\Tests\Fixtures\Post;
 use Duxbo\Seo\Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 final class AuditCommandTest extends TestCase
 {
@@ -88,6 +89,115 @@ final class AuditCommandTest extends TestCase
         $this->artisan('seo:audit', ['model' => Post::class])->assertSuccessful();
 
         $this->assertSame(2, AuditBatch::query()->count());
+    }
+
+    public function test_external_signals_are_null_when_nothing_has_ever_checked_this_url(): void
+    {
+        $this->makePost();
+
+        $this->artisan('seo:audit', ['model' => Post::class])->assertSuccessful();
+
+        $audit = Audit::query()->first();
+        $batch = AuditBatch::query()->first();
+
+        $this->assertNull($audit->pagespeed_score);
+        $this->assertNull($audit->gsc_verdict);
+        $this->assertNull($audit->broken_links_count);
+        $this->assertNull($batch->average_pagespeed_score);
+        $this->assertNull($batch->records_not_indexed);
+        $this->assertNull($batch->records_with_broken_links);
+    }
+
+    public function test_joins_in_the_latest_stored_pagespeed_score_for_the_records_url(): void
+    {
+        $post = $this->makePost(['slug' => 'toc-do']);
+
+        DB::table('seo_pagespeed_stats')->insert([
+            ['url' => $post->seoUrl(), 'url_hash' => md5($post->seoUrl()), 'strategy' => 'mobile', 'date' => now()->subDay()->toDateString(), 'performance_score' => 40, 'created_at' => now(), 'updated_at' => now()],
+            ['url' => $post->seoUrl(), 'url_hash' => md5($post->seoUrl()), 'strategy' => 'mobile', 'date' => now()->toDateString(), 'performance_score' => 96, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $this->artisan('seo:audit', ['model' => Post::class])
+            ->expectsOutputToContain('Average PageSpeed: 96')
+            ->assertSuccessful();
+
+        $this->assertSame(96, Audit::query()->first()->pagespeed_score);
+        $this->assertEquals(96.0, AuditBatch::query()->first()->average_pagespeed_score);
+    }
+
+    public function test_joins_in_the_latest_gsc_verdict_and_counts_it_as_not_indexed(): void
+    {
+        $post = $this->makePost(['slug' => 'chua-index']);
+
+        DB::table('seo_url_inspections')->insert([
+            'url' => $post->seoUrl(), 'url_hash' => md5($post->seoUrl()), 'date' => now()->toDateString(),
+            'verdict' => 'FAIL', 'coverage_state' => 'Crawled - currently not indexed',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->artisan('seo:audit', ['model' => Post::class])
+            ->expectsOutputToContain("1 record(s) not passing Search Console's own index check")
+            ->assertSuccessful();
+
+        $this->assertSame('FAIL', Audit::query()->first()->gsc_verdict);
+        $this->assertSame(1, AuditBatch::query()->first()->records_not_indexed);
+    }
+
+    public function test_a_passing_gsc_verdict_is_not_counted_as_not_indexed(): void
+    {
+        $post = $this->makePost(['slug' => 'da-index']);
+
+        DB::table('seo_url_inspections')->insert([
+            'url' => $post->seoUrl(), 'url_hash' => md5($post->seoUrl()), 'date' => now()->toDateString(),
+            'verdict' => 'PASS', 'coverage_state' => 'Submitted and indexed',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->artisan('seo:audit', ['model' => Post::class])->assertSuccessful();
+
+        $this->assertSame(0, AuditBatch::query()->first()->records_not_indexed);
+    }
+
+    public function test_counts_a_records_currently_broken_external_links(): void
+    {
+        $post = $this->makePost(['slug' => 'link-hong']);
+
+        DB::table('seo_external_links')->insert([
+            'source_type' => $post->seoType(), 'source_id' => (string) $post->getKey(),
+            'target_url' => 'https://mot-trang-da-mat.com/x', 'target_hash' => md5('https://mot-trang-da-mat.com/x'),
+            'created_at' => now(),
+        ]);
+        DB::table('seo_link_checks')->insert([
+            'url' => 'https://mot-trang-da-mat.com/x', 'url_hash' => md5('https://mot-trang-da-mat.com/x'),
+            'successful' => false, 'status_code' => 404, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->artisan('seo:audit', ['model' => Post::class])
+            ->expectsOutputToContain('1 record(s) cite at least one currently-broken external link')
+            ->assertSuccessful();
+
+        $this->assertSame(1, Audit::query()->first()->broken_links_count);
+        $this->assertSame(1, AuditBatch::query()->first()->records_with_broken_links);
+    }
+
+    public function test_a_crawled_record_with_no_broken_links_reports_zero_not_null(): void
+    {
+        $post = $this->makePost(['slug' => 'link-song']);
+
+        DB::table('seo_external_links')->insert([
+            'source_type' => $post->seoType(), 'source_id' => (string) $post->getKey(),
+            'target_url' => 'https://van-con-song.com/x', 'target_hash' => md5('https://van-con-song.com/x'),
+            'created_at' => now(),
+        ]);
+        DB::table('seo_link_checks')->insert([
+            'url' => 'https://van-con-song.com/x', 'url_hash' => md5('https://van-con-song.com/x'),
+            'successful' => true, 'status_code' => 200, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->artisan('seo:audit', ['model' => Post::class])->assertSuccessful();
+
+        $this->assertSame(0, Audit::query()->first()->broken_links_count);
+        $this->assertSame(0, AuditBatch::query()->first()->records_with_broken_links);
     }
 
     /**

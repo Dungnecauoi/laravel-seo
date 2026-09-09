@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $locale
  * @property int $score
  * @property list<string>|null $failed_checks
+ * @property int|null $pagespeed_score
+ * @property string|null $gsc_verdict
+ * @property int|null $broken_links_count
  */
 final class Audit extends Model
 {

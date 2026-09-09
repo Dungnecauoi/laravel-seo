@@ -23,7 +23,8 @@ final class AuditHistoryTool implements AiTool
 
     public function description(): string
     {
-        return 'List past seo:audit batches with their average/min/max score, optionally filtered by model.';
+        return 'List past seo:audit batches with their average/min/max content score plus average PageSpeed, '
+            .'not-indexed count, and broken-link count where those were checked, optionally filtered by model.';
     }
 
     public function inputSchema(): array
@@ -61,6 +62,9 @@ final class AuditHistoryTool implements AiTool
             'averageScore' => $batch->average_score,
             'minScore' => $batch->min_score,
             'maxScore' => $batch->max_score,
+            'averagePagespeedScore' => $batch->average_pagespeed_score,
+            'recordsNotIndexed' => $batch->records_not_indexed,
+            'recordsWithBrokenLinks' => $batch->records_with_broken_links,
             'startedAt' => optional($batch->started_at)->toIso8601String(),
             'finishedAt' => optional($batch->finished_at)->toIso8601String(),
         ], $paginator->items());

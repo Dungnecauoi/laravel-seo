@@ -36,6 +36,9 @@
                         <th>Điểm trung bình</th>
                         <th>Thấp nhất</th>
                         <th>Cao nhất</th>
+                        <th>PageSpeed TB</th>
+                        <th>Chưa index</th>
+                        <th>Link chết</th>
                         <th>Chạy lúc</th>
                     </tr>
                 </thead>
@@ -55,6 +58,31 @@
                             </td>
                             <td>{{ $batch->min_score ?? '—' }}</td>
                             <td>{{ $batch->max_score ?? '—' }}</td>
+                            <td>
+                                @if ($batch->average_pagespeed_score !== null)
+                                    {{ number_format($batch->average_pagespeed_score, 1) }}
+                                @else
+                                    <span class="seo-muted" title="Chưa chạy seo:pagespeed cho các URL này">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($batch->records_not_indexed === null)
+                                    <span class="seo-muted" title="Chưa chạy seo:search-console:inspect cho các URL này">—</span>
+                                @elseif ($batch->records_not_indexed > 0)
+                                    <span class="seo-pill is-bad">{{ $batch->records_not_indexed }}</span>
+                                @else
+                                    <span class="seo-pill is-ok">0</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if ($batch->records_with_broken_links === null)
+                                    <span class="seo-muted" title="Chưa chạy seo:broken-links cho các bản ghi này">—</span>
+                                @elseif ($batch->records_with_broken_links > 0)
+                                    <span class="seo-pill is-bad">{{ $batch->records_with_broken_links }}</span>
+                                @else
+                                    <span class="seo-pill is-ok">0</span>
+                                @endif
+                            </td>
                             <td class="seo-muted">{{ optional($batch->started_at)->format('d/m/Y H:i') }}</td>
                         </tr>
                     @endforeach

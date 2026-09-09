@@ -186,7 +186,14 @@ export interface DynamicSettingsResponse {
   settings: Record<string, DynamicSettingValue>
 }
 
-/** One `php artisan seo:audit` run. */
+/**
+ * One `php artisan seo:audit` run. `averageScore`/`minScore`/`maxScore` are
+ * always computed from real content analysis. `averagePagespeedScore` /
+ * `recordsNotIndexed` / `recordsWithBrokenLinks` are joined in from whatever
+ * `seo:pagespeed` / `seo:search-console:inspect` / `seo:broken-links` had
+ * already stored for these records' URLs — `null` means "never checked",
+ * not "checked and fine".
+ */
 export interface AuditBatchEntry {
   id: number
   model: string
@@ -195,6 +202,9 @@ export interface AuditBatchEntry {
   averageScore: number | null
   minScore: number | null
   maxScore: number | null
+  averagePagespeedScore: number | null
+  recordsNotIndexed: number | null
+  recordsWithBrokenLinks: number | null
   startedAt: string | null
   finishedAt: string | null
 }

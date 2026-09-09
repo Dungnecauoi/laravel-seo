@@ -44,6 +44,9 @@ export function SeoAuditHistory({ client, model, className = '' }: SeoAuditHisto
             <th className="px-3 py-2 font-medium">Số bản ghi</th>
             <th className="px-3 py-2 font-medium">Điểm TB</th>
             <th className="px-3 py-2 font-medium">Thấp / Cao</th>
+            <th className="px-3 py-2 font-medium">PageSpeed TB</th>
+            <th className="px-3 py-2 font-medium">Chưa index</th>
+            <th className="px-3 py-2 font-medium">Link chết</th>
             <th className="px-3 py-2 font-medium">Chạy lúc</th>
           </tr>
         </thead>
@@ -71,6 +74,39 @@ export function SeoAuditHistory({ client, model, className = '' }: SeoAuditHisto
               </td>
               <td className="px-3 py-2 text-slate-500">
                 {batch.minScore ?? '—'} / {batch.maxScore ?? '—'}
+              </td>
+              <td className="px-3 py-2 text-slate-500">
+                {batch.averagePagespeedScore !== null ? batch.averagePagespeedScore.toFixed(1) : '—'}
+              </td>
+              <td className="px-3 py-2">
+                {batch.recordsNotIndexed === null ? (
+                  <span className="text-slate-400">—</span>
+                ) : (
+                  <span
+                    className={
+                      batch.recordsNotIndexed > 0
+                        ? 'rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700'
+                        : 'rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700'
+                    }
+                  >
+                    {batch.recordsNotIndexed}
+                  </span>
+                )}
+              </td>
+              <td className="px-3 py-2">
+                {batch.recordsWithBrokenLinks === null ? (
+                  <span className="text-slate-400">—</span>
+                ) : (
+                  <span
+                    className={
+                      batch.recordsWithBrokenLinks > 0
+                        ? 'rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-700'
+                        : 'rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700'
+                    }
+                  >
+                    {batch.recordsWithBrokenLinks}
+                  </span>
+                )}
               </td>
               <td className="px-3 py-2 text-slate-500">
                 {batch.startedAt ? new Date(batch.startedAt).toLocaleString('vi-VN') : '—'}
