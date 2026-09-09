@@ -184,6 +184,17 @@ through a model-wide template, never entered on a specific record, is not
 caught this way — if a whole model should never appear in the sitemap, do not
 register it as a source.
 
+**Image sitemaps** attach the same way — implement `HasSitemapImages` and
+return the page's own image URLs, so Google Images can discover them without
+crawling the page's HTML first:
+
+```php
+public function seoSitemapImages(): array
+{
+    return [$this->cover_url, ...$this->gallery_urls];
+}
+```
+
 **Video sitemaps** attach to whatever a model already yields — implement
 `HasSitemapVideo` and the entry rides along on that record's own `<url>` block,
 since a video belongs on the page that hosts it, not in a separate feed:
@@ -266,6 +277,27 @@ every panel edit, for every project, whether or not IndexNow is relevant to
 it. Every call is logged to `seo_indexnow_log` — one row per API call, not
 per URL — so "did this submission actually go through" has an answer besides
 the console output scrolling past. `seo.indexnow.log = false` turns that off.
+
+### Tracking scripts
+
+```php
+'tracking' => [
+    'head' => '<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXX"></script>...',
+    'body_open' => '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXX"></iframe></noscript>',
+],
+```
+
+Marketing/analytics tags — GA4, Google Tag Manager, Meta Pixel, TikTok Pixel —
+are not SEO, and this package doesn't parse or understand any of them. It only
+ever echoes back exactly what is pasted here, unescaped, via `@seoTrackingHead`
+/ `@seoTrackingBody` in a layout (or `Seo::trackingHead()` /
+`Seo::trackingBodyOpen()` directly). `body_open` exists because GTM's own
+install instructions ask for a `<noscript><iframe>` immediately after `<body>`
+on top of the head snippet — most providers only need `head`. Both are plain
+strings, so both work through [dynamic settings](#dynamic-settings) too,
+letting a client swap a container ID from the panel without a deploy. Treat
+this field with the same trust you'd give `schema.organization.*` — it is
+real markup, never a place for anything sourced from an untrusted user.
 
 ### Audit history
 
@@ -552,6 +584,12 @@ findings in the prompt instead of writing generic meta, and
 *real* candidate URLs and constrain the answer's JSON Schema to an `enum` of
 exactly those — the model cannot hallucinate a URL no matter what the prompt
 alone asks for, because the schema itself won't accept one.
+`suggestAltText()` is the one honest exception to "grounded in real data":
+nothing in this package's AI pipeline is multi-modal, so it infers alt text
+for images missing it from the page's own content and each file name, never
+from what the image actually shows — the prompt says so outright, and a
+caller should treat the result as a starting point to review, not a finished
+description.
 
 **AI tool registry** — every capability of this package described well
 enough for an AI agent to discover and call, without hand-written glue for
@@ -572,25 +610,28 @@ default) require a propose-then-confirm round trip — the first call returns
 a proposal id and a preview with nothing mutated, the second must name that
 id to actually run, replaying the input captured at propose time rather than
 whatever the confirming call sends. Every propose and apply is logged to
-`seo_ai_tool_calls`. Twenty-seven tools in all: thirteen read-only — seven
+`seo_ai_tool_calls`. Thirty-three tools in all: fifteen read-only — eight
 plain reads (`seo.meta.get`, `seo.redirects.list`, `seo.not_found.list`,
 `seo.dashboard.summary`, `seo.audit.history`, `seo.internal_links.list`,
-`seo.settings.get`), four AI suggestions grounded in real data
-(`seo.meta.suggest`, `seo.analysis.suggest_fixes`,
-`seo.not_found.suggest_redirect_target`, `seo.internal_links.suggest_fixes`),
-two console-command reports (`seo.console.duplicates`, `.hreflang`) — nine
-that write (`seo.meta.apply`, `seo.redirects.create`/`.toggle`,
-`seo.not_found.convert_to_redirect`, `seo.settings.set`, plus four more
-console commands: `seo.console.audit`/`.internal_links`/`.sitemap`/
-`.search_console_sync`), and five that delete or otherwise cannot be undone
+`seo.broken_links.list`, `seo.settings.get`), five AI suggestions grounded
+in real data (`seo.meta.suggest`, `seo.analysis.suggest_fixes`,
+`seo.analysis.suggest_alt_text`, `seo.not_found.suggest_redirect_target`,
+`seo.internal_links.suggest_fixes`), two console-command reports
+(`seo.console.duplicates`, `.hreflang`) — twelve that write
+(`seo.meta.apply`, `seo.redirects.create`/`.toggle`,
+`seo.not_found.convert_to_redirect`, `seo.settings.set`,
+`seo.pagespeed.check`, `seo.search_console.inspect`, plus five console
+commands: `seo.console.audit`/`.internal_links`/`.broken_links`/`.sitemap`/
+`.search_console_sync`), and six that delete or otherwise cannot be undone
 (`seo.meta.delete`, `seo.redirects.delete`, `seo.not_found.prune`,
-`seo.settings.clear`, `seo.indexnow.submit`). The six `seo.console.*` tools
-wrap an Artisan command directly — `Artisan::call()` only ever returns an
-exit code and whatever it printed, so they return `{exitCode, output}`
-rather than a shape pretending to be richer than a terminal command
-actually is; `seo:indexnow` and `seo:prune-404` are deliberately not
-wrapped this way since the dedicated tools above already cover them with
-real structured output.
+`seo.settings.clear`, `seo.indexnow.submit`, `seo.google_indexing.submit`).
+The seven `seo.console.*` tools wrap an Artisan command directly —
+`Artisan::call()` only ever returns an exit code and whatever it printed, so
+they return `{exitCode, output}` rather than a shape pretending to be richer
+than a terminal command actually is; `seo:indexnow`, `seo:pagespeed`,
+`seo:google-indexing`, `seo:search-console:inspect` and `seo:prune-404` are
+deliberately not wrapped this way since the dedicated tools above already
+cover them with real structured output.
 
 Two ways an external agent reaches the same registry, no PHP required:
 

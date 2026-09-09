@@ -211,6 +211,59 @@ final class PromptLibrary
     }
 
     /**
+     * Suggests alt text for images missing it — grounded in the page's own
+     * content and each image's file name, never in what the image actually
+     * shows: nothing in this package's AI pipeline is multi-modal, so this
+     * is an educated guess from context, not a real image description. The
+     * prompt itself says so, rather than letting the model quietly pretend
+     * otherwise.
+     *
+     * @param  list<string>  $imageUrls  Src of each image missing alt text. Must be non-empty.
+     */
+    public function imageAlt(string $content, array $imageUrls, ?string $keyword = null, ?string $locale = null): AiRequest
+    {
+        $locale ??= (string) $this->config->get('app.locale');
+
+        return new AiRequest(
+            prompt: $this->render('image_alt', [
+                'content' => $this->trim($content),
+                'keyword' => $keyword ?? '—',
+                'images' => implode("\n", array_map(
+                    static fn (string $url, int $index): string => sprintf('%d. %s', $index + 1, $url),
+                    $imageUrls,
+                    array_keys($imageUrls),
+                )),
+            ], $locale),
+            schema: [
+                'type' => 'object',
+                'properties' => [
+                    'altTexts' => [
+                        'type' => 'array',
+                        'description' => 'One entry per image URL listed above',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'src' => [
+                                    'type' => 'string',
+                                    'enum' => $imageUrls,
+                                    'description' => 'One of the image URLs above, verbatim',
+                                ],
+                                'alt' => ['type' => 'string', 'description' => 'Suggested alt text'],
+                            ],
+                            'required' => ['src', 'alt'],
+                            'additionalProperties' => false,
+                        ],
+                    ],
+                ],
+                'required' => ['altTexts'],
+                'additionalProperties' => false,
+            ],
+            system: $this->render('system', [], $locale),
+            locale: $locale,
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $replace
      */
     private function render(string $key, array $replace, string $locale): string

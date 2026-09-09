@@ -67,6 +67,22 @@ return [
     :candidates
     TEXT,
 
+    'image_alt' => <<<'TEXT'
+    Các ảnh dưới đây thiếu alt text. Bạn không nhìn thấy ảnh — chỉ có tên file
+    và nội dung trang để suy luận, nên hãy đoán mô tả cụ thể, hợp lý dựa trên
+    ngữ cảnh thay vì viết chung chung ("hình ảnh", "ảnh"). Nếu tên file không
+    gợi ý được gì, hãy viết mô tả cụ thể nhất mà nội dung xung quanh còn hỗ
+    trợ được.
+
+    Từ khoá chính: :keyword
+
+    Ảnh (viết một alt text cho mỗi URL, đúng thứ tự):
+    :images
+
+    Nội dung:
+    :content
+    TEXT,
+
     'context_heading' => 'Bối cảnh bổ sung:',
 
     'context_site' => 'Trang web này tên là ":brand".',

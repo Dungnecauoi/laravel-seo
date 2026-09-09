@@ -4,14 +4,17 @@ import type {
   AiToolManifestResponse,
   AnalysisReport,
   AuditHistoryResponse,
+  BrokenLinksResponse,
   ContentListResponse,
   DashboardStats,
   DynamicSettingsResponse,
+  GoogleIndexingLogResponse,
   IndexNowLogResponse,
   InternalLinksResponse,
   MetaResponse,
   NotFoundEntry,
   OutputFormat,
+  PageSpeedStatsResponse,
   RedirectInput,
   RedirectListResponse,
   ResolvedMeta,
@@ -19,6 +22,7 @@ import type {
   SeoClientOptions,
   SeoData,
   SettingsResponse,
+  UrlInspectionsResponse,
 } from './types.js'
 
 /** The API contract this client was written against. */
@@ -53,10 +57,18 @@ export interface SeoClient {
   auditHistory(model?: string, page?: number): Promise<AuditHistoryResponse>
   /** Read side of `php artisan seo:internal-links`. */
   internalLinks(type?: string, page?: number): Promise<InternalLinksResponse>
+  /** Currently-known-broken external URLs, from `php artisan seo:broken-links`. */
+  brokenLinks(page?: number): Promise<BrokenLinksResponse>
   /** Read side of `php artisan seo:search-console:sync`. */
   searchConsoleStats(days?: number): Promise<SearchConsoleStatsResponse>
+  /** Read side of `php artisan seo:search-console:inspect`. */
+  urlInspections(): Promise<UrlInspectionsResponse>
   /** Recent IndexNow submissions, newest first. */
   indexNowLog(limit?: number): Promise<IndexNowLogResponse>
+  /** Recent Google Indexing API submissions, newest first. */
+  googleIndexingLog(limit?: number): Promise<GoogleIndexingLogResponse>
+  /** The latest PageSpeed Insights run per URL, for one strategy. */
+  pageSpeedStats(strategy?: 'mobile' | 'desktop'): Promise<PageSpeedStatsResponse>
 
   /** Every capability of this package an AI agent can discover and call. */
   aiTools(): Promise<AiToolManifestResponse>
@@ -253,12 +265,28 @@ export function createSeoClient(options: SeoClientOptions): SeoClient {
       return request(`internal-links${query({ type, page })}`)
     },
 
+    brokenLinks(page) {
+      return request(`broken-links${query({ page })}`)
+    },
+
     searchConsoleStats(days) {
       return request(`search-console/stats${query({ days })}`)
     },
 
+    urlInspections() {
+      return request('search-console/inspections')
+    },
+
     indexNowLog(limit) {
       return request(`indexnow/log${query({ limit })}`)
+    },
+
+    googleIndexingLog(limit) {
+      return request(`google-indexing/log${query({ limit })}`)
+    },
+
+    pageSpeedStats(strategy) {
+      return request(`pagespeed/stats${query({ strategy })}`)
     },
 
     aiTools() {

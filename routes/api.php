@@ -6,18 +6,22 @@ use Duxbo\Seo\Http\Api\V1\AiToolCallsController;
 use Duxbo\Seo\Http\Api\V1\AiToolsController;
 use Duxbo\Seo\Http\Api\V1\AnalyzeController;
 use Duxbo\Seo\Http\Api\V1\AuditHistoryController;
+use Duxbo\Seo\Http\Api\V1\BrokenLinksController;
 use Duxbo\Seo\Http\Api\V1\ContentController;
 use Duxbo\Seo\Http\Api\V1\DashboardController;
 use Duxbo\Seo\Http\Api\V1\DynamicSettingsController;
+use Duxbo\Seo\Http\Api\V1\GoogleIndexingLogController;
 use Duxbo\Seo\Http\Api\V1\IndexNowLogController;
 use Duxbo\Seo\Http\Api\V1\InternalLinksController;
 use Duxbo\Seo\Http\Api\V1\McpController;
 use Duxbo\Seo\Http\Api\V1\MetaController;
 use Duxbo\Seo\Http\Api\V1\NotFoundController;
+use Duxbo\Seo\Http\Api\V1\PageSpeedStatsController;
 use Duxbo\Seo\Http\Api\V1\RedirectsController;
 use Duxbo\Seo\Http\Api\V1\ResolveController;
 use Duxbo\Seo\Http\Api\V1\SearchConsoleStatsController;
 use Duxbo\Seo\Http\Api\V1\SettingsController;
+use Duxbo\Seo\Http\Api\V1\UrlInspectionsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -82,8 +86,12 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
         // page load waits on), these just expose what it already wrote.
         Route::get('audit-history', [AuditHistoryController::class, 'index']);
         Route::get('internal-links', [InternalLinksController::class, 'index']);
+        Route::get('broken-links', [BrokenLinksController::class, 'index']);
         Route::get('search-console/stats', [SearchConsoleStatsController::class, 'index']);
+        Route::get('search-console/inspections', [UrlInspectionsController::class, 'index']);
+        Route::get('pagespeed/stats', [PageSpeedStatsController::class, 'index']);
         Route::get('indexnow/log', [IndexNowLogController::class, 'index']);
+        Route::get('google-indexing/log', [GoogleIndexingLogController::class, 'index']);
 
         // Every capability above, described well enough for an AI agent to
         // discover and call without hand-written glue. The manifest and

@@ -51,6 +51,10 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
     internalLinks: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
     searchConsoleStats: async () => ({ days: 30, totalClicks: 0, totalImpressions: 0, data: [] }),
     indexNowLog: async () => ({ data: [] }),
+    googleIndexingLog: async () => ({ data: [] }),
+    pageSpeedStats: async () => ({ strategy: 'mobile', data: [] }),
+    urlInspections: async () => ({ data: [] }),
+    brokenLinks: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
     aiTools: async () => ({ tools: [] }),
     aiToolCalls: async () => ({ data: [], meta: { currentPage: 1, lastPage: 1, total: 0 } }),
   }

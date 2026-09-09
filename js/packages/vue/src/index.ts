@@ -10,8 +10,12 @@ export { SeoNotFoundMonitor } from './SeoNotFoundMonitor.js'
 export { SeoSettings } from './SeoSettings.js'
 export { SeoAuditHistory } from './SeoAuditHistory.js'
 export { SeoInternalLinks } from './SeoInternalLinks.js'
+export { SeoBrokenLinks } from './SeoBrokenLinks.js'
 export { SeoSearchConsoleStats } from './SeoSearchConsoleStats.js'
 export { SeoIndexNowLog } from './SeoIndexNowLog.js'
+export { SeoGoogleIndexingLog } from './SeoGoogleIndexingLog.js'
+export { SeoPageSpeedStats } from './SeoPageSpeedStats.js'
+export { SeoUrlInspections } from './SeoUrlInspections.js'
 export { SeoAiToolCalls } from './SeoAiToolCalls.js'
 
 export type {
@@ -22,6 +26,9 @@ export type {
   AnalysisReport,
   AuditBatchEntry,
   AuditHistoryResponse,
+  BrokenLinkRow,
+  BrokenLinkSource,
+  BrokenLinksResponse,
   CheckResult,
   CheckStatus,
   ContentListResponse,
@@ -29,6 +36,8 @@ export type {
   DashboardStats,
   DynamicSettingValue,
   DynamicSettingsResponse,
+  GoogleIndexingLogEntry,
+  GoogleIndexingLogResponse,
   IndexNowLogEntry,
   IndexNowLogResponse,
   InternalLinkRow,
@@ -40,6 +49,8 @@ export type {
   OpenGraphData,
   OutputFormat,
   PageMeta,
+  PageSpeedStatRow,
+  PageSpeedStatsResponse,
   RedirectEntry,
   RedirectInput,
   RedirectListResponse,
@@ -53,4 +64,6 @@ export type {
   SeoData,
   SettingsResponse,
   TwitterData,
+  UrlInspectionRow,
+  UrlInspectionsResponse,
 } from '@duxbo/seo-core'

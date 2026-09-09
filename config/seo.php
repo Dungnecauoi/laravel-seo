@@ -2,15 +2,19 @@
 
 declare(strict_types=1);
 
+use Duxbo\Seo\Ai\Tools\Analysis\SuggestAltTextTool;
 use Duxbo\Seo\Ai\Tools\Analysis\SuggestContentFixesTool;
 use Duxbo\Seo\Ai\Tools\Audit\AuditHistoryTool;
+use Duxbo\Seo\Ai\Tools\BrokenLinks\ListBrokenLinksTool;
 use Duxbo\Seo\Ai\Tools\Console\RunAuditCommandTool;
+use Duxbo\Seo\Ai\Tools\Console\RunBrokenLinksCommandTool;
 use Duxbo\Seo\Ai\Tools\Console\RunDuplicatesCommandTool;
 use Duxbo\Seo\Ai\Tools\Console\RunHreflangAuditCommandTool;
 use Duxbo\Seo\Ai\Tools\Console\RunInternalLinksCommandTool;
 use Duxbo\Seo\Ai\Tools\Console\RunSearchConsoleSyncCommandTool;
 use Duxbo\Seo\Ai\Tools\Console\RunSitemapCommandTool;
 use Duxbo\Seo\Ai\Tools\Dashboard\DashboardSummaryTool;
+use Duxbo\Seo\Ai\Tools\GoogleIndexing\SubmitUrlsTool as GoogleIndexingSubmitUrlsTool;
 use Duxbo\Seo\Ai\Tools\IndexNow\SubmitUrlsTool;
 use Duxbo\Seo\Ai\Tools\InternalLinks\ListInternalLinksTool;
 use Duxbo\Seo\Ai\Tools\InternalLinks\SuggestInternalLinkFixesTool;
@@ -22,10 +26,12 @@ use Duxbo\Seo\Ai\Tools\NotFound\ConvertNotFoundToRedirectTool;
 use Duxbo\Seo\Ai\Tools\NotFound\ListNotFoundTool;
 use Duxbo\Seo\Ai\Tools\NotFound\PruneNotFoundTool;
 use Duxbo\Seo\Ai\Tools\NotFound\SuggestRedirectTargetTool;
+use Duxbo\Seo\Ai\Tools\PageSpeed\CheckUrlsTool as PageSpeedCheckUrlsTool;
 use Duxbo\Seo\Ai\Tools\Redirects\CreateRedirectTool;
 use Duxbo\Seo\Ai\Tools\Redirects\DeleteRedirectTool;
 use Duxbo\Seo\Ai\Tools\Redirects\ListRedirectsTool;
 use Duxbo\Seo\Ai\Tools\Redirects\ToggleRedirectTool;
+use Duxbo\Seo\Ai\Tools\SearchConsole\InspectUrlsTool;
 use Duxbo\Seo\Ai\Tools\Settings\ClearSettingTool;
 use Duxbo\Seo\Ai\Tools\Settings\GetSettingsTool;
 use Duxbo\Seo\Ai\Tools\Settings\SetSettingTool;
@@ -181,6 +187,31 @@ return [
         'yandex' => env('SEO_VERIFY_YANDEX'),
         'pinterest' => env('SEO_VERIFY_PINTEREST'),
         'facebook' => env('SEO_VERIFY_FACEBOOK'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Tracking scripts
+    |--------------------------------------------------------------------------
+    |
+    | Site-wide, not per-page: GA4/gtag.js, Google Tag Manager, Meta Pixel,
+    | TikTok Pixel and the like are marketing/analytics tags, not SEO — this
+    | package doesn't parse or understand any of them, it only ever echoes
+    | back exactly what is pasted here at @seoTrackingHead / @seoTrackingBody
+    | (or Seo::trackingHead() / Seo::trackingBodyOpen()), unescaped, since
+    | the whole point is real <script> tags. That makes this a *trusted*
+    | field — the same trust level as schema.organization.* already has —
+    | never a place to put anything sourced from an untrusted user.
+    |
+    | `body_open` exists because Google Tag Manager's own install
+    | instructions ask for a <noscript><iframe> immediately after <body>, on
+    | top of the head snippet — most providers only need `head`.
+    |
+    */
+
+    'tracking' => [
+        'head' => null,
+        'body_open' => null,
     ],
 
     /*
@@ -432,6 +463,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Google Indexing API
+    |--------------------------------------------------------------------------
+    |
+    | Google does not participate in IndexNow. This is its own separate
+    | endpoint (`indexing.googleapis.com`) — and Google only *documents* it
+    | for JobPosting and BroadcastEvent (livestream) pages. It accepts and
+    | returns 200 for any other URL too, but Google does not promise faster
+    | indexing for it, and submitting unrelated content in bulk has been
+    | reported to get accounts rate-limited. `enabled = true` here is an
+    | informed choice a project makes for itself — this package does not
+    | gate submission by content type.
+    |
+    | Needs a one-time manual setup: a Google Cloud project with the
+    | Indexing API enabled, a service account with a downloaded JSON key,
+    | and that service account's email added as an Owner on the Search
+    | Console property (Settings → Users and permissions). `client_email`
+    | and `private_key` come straight from that JSON key — no OAuth consent
+    | screen is ever run by this package.
+    |
+    */
+
+    'google_indexing' => [
+        'enabled' => env('SEO_GOOGLE_INDEXING_ENABLED', false),
+        'client_email' => env('SEO_GOOGLE_INDEXING_CLIENT_EMAIL'),
+        'private_key' => env('SEO_GOOGLE_INDEXING_PRIVATE_KEY'),
+
+        // One row per URL, not per call — the Indexing API itself only
+        // ever accepts one URL per publish request.
+        'log' => true,
+        'log_table' => 'seo_google_indexing_log',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Audit history
     |--------------------------------------------------------------------------
     |
@@ -469,6 +534,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Broken external links
+    |--------------------------------------------------------------------------
+    |
+    | `php artisan seo:broken-links` writes here — split into two tables the
+    | same reason `seo_internal_links` isn't further split: `external_table`
+    | is which pages cite which URL (crawled, replaced wholesale per record,
+    | same as internal_links), `checks_table` is whether that URL is still
+    | good (one row per distinct URL, so a link cited from fifty records is
+    | checked once, not fifty times).
+    |
+    */
+
+    'broken_links' => [
+        'external_table' => 'seo_external_links',
+        'checks_table' => 'seo_link_checks',
+        'timeout' => 10,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Search Console
     |--------------------------------------------------------------------------
     |
@@ -495,6 +580,36 @@ return [
         'refresh_token' => env('SEO_SEARCH_CONSOLE_REFRESH_TOKEN'),
         'site_url' => env('SEO_SEARCH_CONSOLE_SITE_URL'),
         'table' => 'seo_search_console_stats',
+
+        // `php artisan seo:search-console:inspect` writes here — same
+        // credentials above, a different Search Console endpoint (URL
+        // Inspection instead of Search Analytics).
+        'inspections_table' => 'seo_url_inspections',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | PageSpeed Insights
+    |--------------------------------------------------------------------------
+    |
+    | Lighthouse performance score and Core Web Vitals, per URL. Unlike
+    | Search Console there is no "pull every page" endpoint — this only ever
+    | scores the URL(s) it is explicitly asked to via `php artisan
+    | seo:pagespeed` or the `seo.pagespeed.check` AI tool, and stores the
+    | result so a trend line is possible.
+    |
+    | Setup is a plain API key, not the OAuth dance `search_console` and
+    | `google_indexing` both need: enable "PageSpeed Insights API" in Google
+    | Cloud Console, create an API key under Credentials, and set it here.
+    | The free quota (25,000 requests/day at the time of writing) is far more
+    | than a normal site's handful of tracked pages needs.
+    |
+    */
+
+    'pagespeed' => [
+        'enabled' => env('SEO_PAGESPEED_ENABLED', false),
+        'api_key' => env('SEO_PAGESPEED_API_KEY'),
+        'table' => 'seo_pagespeed_stats',
     ],
 
     /*
@@ -538,6 +653,8 @@ return [
             'verification.yandex',
             'verification.pinterest',
             'verification.facebook',
+            'tracking.head',
+            'tracking.body_open',
             'robots.block_ai_crawlers',
             'schema.organization.name',
             'schema.organization.logo',
@@ -581,6 +698,8 @@ return [
             'verification.yandex' => StringSettingValidator::class,
             'verification.pinterest' => StringSettingValidator::class,
             'verification.facebook' => StringSettingValidator::class,
+            'tracking.head' => StringSettingValidator::class,
+            'tracking.body_open' => StringSettingValidator::class,
             'robots.block_ai_crawlers' => BooleanSettingValidator::class,
             'schema.organization.name' => StringSettingValidator::class,
             'schema.organization.logo' => UrlSettingValidator::class,
@@ -699,9 +818,11 @@ return [
                 DashboardSummaryTool::class,
                 AuditHistoryTool::class,
                 ListInternalLinksTool::class,
+                ListBrokenLinksTool::class,
                 GetSettingsTool::class,
                 SuggestMetaTool::class,
                 SuggestContentFixesTool::class,
+                SuggestAltTextTool::class,
                 SuggestRedirectTargetTool::class,
                 SuggestInternalLinkFixesTool::class,
                 RunDuplicatesCommandTool::class,
@@ -715,14 +836,18 @@ return [
                 ApplyMetaTool::class,
                 RunAuditCommandTool::class,
                 RunInternalLinksCommandTool::class,
+                RunBrokenLinksCommandTool::class,
                 RunSitemapCommandTool::class,
                 RunSearchConsoleSyncCommandTool::class,
+                PageSpeedCheckUrlsTool::class,
+                InspectUrlsTool::class,
 
                 // Destructive
                 DeleteRedirectTool::class,
                 PruneNotFoundTool::class,
                 ClearSettingTool::class,
                 SubmitUrlsTool::class,
+                GoogleIndexingSubmitUrlsTool::class,
                 DeleteMetaTool::class,
             ],
 

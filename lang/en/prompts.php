@@ -75,6 +75,22 @@ return [
     :candidates
     TEXT,
 
+    'image_alt' => <<<'TEXT'
+    The images below are missing alt text. You cannot see them — you only have
+    their file name and the page's own content to go on, so infer a plausible,
+    specific description from context rather than guessing generically ("image",
+    "photo"). If a file name gives no real clue, write the most specific
+    description the surrounding content still supports.
+
+    Focus keyword: :keyword
+
+    Images (write one alt text per URL, same order):
+    :images
+
+    Content:
+    :content
+    TEXT,
+
     'context_heading' => 'Additional context:',
 
     'context_site' => 'This site is called ":brand".',

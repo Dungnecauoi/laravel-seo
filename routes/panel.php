@@ -5,15 +5,19 @@ declare(strict_types=1);
 use Duxbo\Seo\Http\Controllers\PanelController;
 use Duxbo\Seo\Http\Controllers\Panel\AiToolCallsController;
 use Duxbo\Seo\Http\Controllers\Panel\AuditHistoryController;
+use Duxbo\Seo\Http\Controllers\Panel\BrokenLinksController;
 use Duxbo\Seo\Http\Controllers\Panel\ContentController;
 use Duxbo\Seo\Http\Controllers\Panel\DashboardController;
 use Duxbo\Seo\Http\Controllers\Panel\DynamicSettingsController;
+use Duxbo\Seo\Http\Controllers\Panel\GoogleIndexingLogController;
 use Duxbo\Seo\Http\Controllers\Panel\IndexNowLogController;
 use Duxbo\Seo\Http\Controllers\Panel\InternalLinksController;
 use Duxbo\Seo\Http\Controllers\Panel\NotFoundMonitorController;
+use Duxbo\Seo\Http\Controllers\Panel\PageSpeedStatsController;
 use Duxbo\Seo\Http\Controllers\Panel\RedirectsController;
 use Duxbo\Seo\Http\Controllers\Panel\SearchConsoleStatsController;
 use Duxbo\Seo\Http\Controllers\Panel\SettingsController;
+use Duxbo\Seo\Http\Controllers\Panel\UrlInspectionsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -61,8 +65,12 @@ Route::prefix(config('seo.panel.prefix', 'seo/panel'))
 
         Route::get('audit-history', AuditHistoryController::class)->name('audit-history');
         Route::get('internal-links', InternalLinksController::class)->name('internal-links');
+        Route::get('broken-links', BrokenLinksController::class)->name('broken-links');
         Route::get('search-console', SearchConsoleStatsController::class)->name('search-console');
+        Route::get('url-inspections', UrlInspectionsController::class)->name('url-inspections');
+        Route::get('pagespeed', PageSpeedStatsController::class)->name('pagespeed');
         Route::get('indexnow-log', IndexNowLogController::class)->name('indexnow-log');
+        Route::get('google-indexing-log', GoogleIndexingLogController::class)->name('google-indexing-log');
         Route::prefix('ai-tool-calls')->name('ai-tool-calls.')->group(static function (): void {
             Route::get('/', [AiToolCallsController::class, 'index'])->name('index');
             Route::post('{proposalId}/confirm', [AiToolCallsController::class, 'confirm'])

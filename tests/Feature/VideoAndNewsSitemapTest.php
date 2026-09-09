@@ -7,6 +7,7 @@ namespace Duxbo\Seo\Tests\Feature;
 use Duxbo\Seo\Data\SitemapNews;
 use Duxbo\Seo\Data\SitemapVideo;
 use Duxbo\Seo\Sitemap\SitemapWriter;
+use Duxbo\Seo\Tests\Fixtures\ImagePost;
 use Duxbo\Seo\Tests\Fixtures\Post;
 use Duxbo\Seo\Tests\Fixtures\VideoPost;
 use Duxbo\Seo\Tests\TestCase;
@@ -40,6 +41,34 @@ final class VideoAndNewsSitemapTest extends TestCase
         $this->assertStringContainsString('<video:title>Video mẫu</video:title>', $body);
         $this->assertStringContainsString('<video:content_loc>', $body);
         $this->assertStringContainsString('<video:duration>120</video:duration>', $body);
+    }
+
+    public function test_a_model_declaring_images_gets_them_in_the_sitemap(): void
+    {
+        ImagePost::query()->create(['name' => 'Ảnh mẫu', 'slug' => 'anh-mau']);
+
+        config(['seo.sitemap.cache_ttl' => 0, 'seo.sitemap.sources' => [
+            ['model' => ImagePost::class, 'name' => 'images'],
+        ]]);
+
+        $body = (string) $this->get('/sitemap-images.xml')->getContent();
+
+        $this->assertStringContainsString('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"', $body);
+        $this->assertStringContainsString('<image:loc>https://trangcuatoi.vn/anh/anh-mau-1.jpg</image:loc>', $body);
+        $this->assertStringContainsString('<image:loc>https://trangcuatoi.vn/anh/anh-mau-2.jpg</image:loc>', $body);
+    }
+
+    public function test_a_model_without_images_emits_no_image_block(): void
+    {
+        Post::query()->create(['name' => 'Bài thường', 'slug' => 'bai-thuong-anh']);
+
+        config(['seo.sitemap.cache_ttl' => 0, 'seo.sitemap.sources' => [
+            ['model' => Post::class, 'name' => 'posts'],
+        ]]);
+
+        $body = (string) $this->get('/sitemap-posts.xml')->getContent();
+
+        $this->assertStringNotContainsString('<image:image>', $body);
     }
 
     public function test_a_model_without_videos_emits_no_video_block(): void

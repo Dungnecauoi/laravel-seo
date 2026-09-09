@@ -251,6 +251,98 @@ export interface IndexNowLogResponse {
   data: IndexNowLogEntry[]
 }
 
+/**
+ * One Google Indexing API call — one row per URL, unlike IndexNow's one row
+ * per batch, since the Indexing API itself only ever takes one URL per call.
+ */
+export interface GoogleIndexingLogEntry {
+  id: number
+  url: string
+  type: 'URL_UPDATED' | 'URL_DELETED'
+  successful: boolean
+  statusCode: number | null
+  error: string | null
+  createdAt: string | null
+}
+
+export interface GoogleIndexingLogResponse {
+  data: GoogleIndexingLogEntry[]
+}
+
+/**
+ * The latest PageSpeed Insights run for one URL+strategy — lab metrics from
+ * a synthetic Lighthouse run, plus field data (real Chrome UX Report
+ * visitors) when the URL has enough traffic for Google to have collected
+ * it. `fieldDataAvailable: false` is not a failure, just "not enough data".
+ */
+export interface PageSpeedStatRow {
+  url: string
+  strategy: 'mobile' | 'desktop'
+  performanceScore: number | null
+  lcpMs: number | null
+  clsScore: number | null
+  tbtMs: number | null
+  fcpMs: number | null
+  speedIndexMs: number | null
+  fieldDataAvailable: boolean
+  cwvCategory: 'FAST' | 'AVERAGE' | 'SLOW' | null
+  date: string
+}
+
+export interface PageSpeedStatsResponse {
+  strategy: string
+  data: PageSpeedStatRow[]
+}
+
+/**
+ * The latest URL Inspection result for one URL — whether Google has it
+ * indexed, and why not if it doesn't. `mobileUsabilityIssues` is a list of
+ * issue-type codes (e.g. `TEXT_TOO_SMALL`), not full descriptions — Google's
+ * API returns codes, and this SDK does not localize or explain them.
+ */
+export interface UrlInspectionRow {
+  url: string
+  verdict: 'PASS' | 'PARTIAL' | 'FAIL' | 'NEUTRAL' | null
+  coverageState: string | null
+  robotsTxtState: string | null
+  indexingState: string | null
+  pageFetchState: string | null
+  googleCanonical: string | null
+  userCanonical: string | null
+  mobileUsabilityVerdict: 'PASS' | 'FAIL' | 'NEUTRAL' | null
+  mobileUsabilityIssues: string[]
+  richResultsVerdict: 'PASS' | 'FAIL' | 'NEUTRAL' | null
+  date: string
+}
+
+export interface UrlInspectionsResponse {
+  data: UrlInspectionRow[]
+}
+
+/** One record citing a broken URL. */
+export interface BrokenLinkSource {
+  sourceType: string
+  sourceId: string
+  anchorText: string | null
+}
+
+/**
+ * One currently-known-broken external URL, with which records cite it —
+ * checked once per distinct URL, not once per citing record.
+ */
+export interface BrokenLinkRow {
+  url: string
+  statusCode: number | null
+  error: string | null
+  checkedAt: string | null
+  sources: BrokenLinkSource[]
+}
+
+export interface BrokenLinksResponse {
+  data: BrokenLinkRow[]
+  meta: { currentPage: number; lastPage: number; total: number }
+}
+
 /** One AI tool call, propose and apply alike — from `seo_ai_tool_calls`. */
 export interface AiToolCallEntry {
   id: number

@@ -178,8 +178,12 @@
                     'seo.panel.not-found.index' => '404',
                     'seo.panel.audit-history' => 'Lịch sử audit',
                     'seo.panel.internal-links' => 'Liên kết nội bộ',
+                    'seo.panel.broken-links' => 'Link chết',
                     'seo.panel.search-console' => 'Search Console',
+                    'seo.panel.url-inspections' => 'Kiểm tra URL',
+                    'seo.panel.pagespeed' => 'PageSpeed',
                     'seo.panel.indexnow-log' => 'IndexNow',
+                    'seo.panel.google-indexing-log' => 'Google Indexing',
                     'seo.panel.ai-tool-calls.index' => 'Hoạt động AI',
                     'seo.panel.settings' => 'Cấu hình',
                 ];

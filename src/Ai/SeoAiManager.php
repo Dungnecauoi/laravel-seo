@@ -156,6 +156,30 @@ final class SeoAiManager
     }
 
     /**
+     * Suggest alt text for images missing it — grounded in the page's own
+     * content and each image's file name, not real vision: nothing in this
+     * package's AI pipeline sends an image to the model, only the text
+     * around it. A starting point to review, not a description of what the
+     * image actually shows.
+     *
+     * @param  list<string>  $imageUrls  Src of each image missing alt text. Must be non-empty.
+     * @return array{altTexts?: list<array{src: string, alt: string}>}
+     */
+    public function suggestAltText(string $content, array $imageUrls, ?string $keyword = null, ?string $locale = null): array
+    {
+        $response = $this->manager->complete(
+            $this->prompts->imageAlt($content, $imageUrls, $keyword, $locale),
+            profile: self::PROFILE,
+            purpose: 'image_alt',
+        );
+
+        /** @var array{altTexts?: list<array{src: string, alt: string}>} $result */
+        $result = $response->content;
+
+        return $result;
+    }
+
+    /**
      * @return list<string>
      */
     public function suggestKeywords(string $content, ?string $locale = null): array

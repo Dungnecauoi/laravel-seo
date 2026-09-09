@@ -24,11 +24,23 @@ export type { SeoAuditHistoryProps } from './SeoAuditHistory.js'
 export { SeoInternalLinks } from './SeoInternalLinks.js'
 export type { SeoInternalLinksProps } from './SeoInternalLinks.js'
 
+export { SeoBrokenLinks } from './SeoBrokenLinks.js'
+export type { SeoBrokenLinksProps } from './SeoBrokenLinks.js'
+
 export { SeoSearchConsoleStats } from './SeoSearchConsoleStats.js'
 export type { SeoSearchConsoleStatsProps } from './SeoSearchConsoleStats.js'
 
 export { SeoIndexNowLog } from './SeoIndexNowLog.js'
 export type { SeoIndexNowLogProps } from './SeoIndexNowLog.js'
+
+export { SeoGoogleIndexingLog } from './SeoGoogleIndexingLog.js'
+export type { SeoGoogleIndexingLogProps } from './SeoGoogleIndexingLog.js'
+
+export { SeoPageSpeedStats } from './SeoPageSpeedStats.js'
+export type { SeoPageSpeedStatsProps } from './SeoPageSpeedStats.js'
+
+export { SeoUrlInspections } from './SeoUrlInspections.js'
+export type { SeoUrlInspectionsProps } from './SeoUrlInspections.js'
 
 export { SeoAiToolCalls } from './SeoAiToolCalls.js'
 export type { SeoAiToolCallsProps } from './SeoAiToolCalls.js'
@@ -41,6 +53,9 @@ export type {
   AnalysisReport,
   AuditBatchEntry,
   AuditHistoryResponse,
+  BrokenLinkRow,
+  BrokenLinkSource,
+  BrokenLinksResponse,
   CheckResult,
   CheckStatus,
   ContentListResponse,
@@ -48,6 +63,8 @@ export type {
   DashboardStats,
   DynamicSettingValue,
   DynamicSettingsResponse,
+  GoogleIndexingLogEntry,
+  GoogleIndexingLogResponse,
   IndexNowLogEntry,
   IndexNowLogResponse,
   InternalLinkRow,
@@ -60,6 +77,8 @@ export type {
   OpenGraphData,
   OutputFormat,
   PageMeta,
+  PageSpeedStatRow,
+  PageSpeedStatsResponse,
   RedirectEntry,
   RedirectInput,
   RedirectListResponse,
@@ -73,4 +92,6 @@ export type {
   SeoData,
   SettingsResponse,
   TwitterData,
+  UrlInspectionRow,
+  UrlInspectionsResponse,
 } from '@duxbo/seo-core'

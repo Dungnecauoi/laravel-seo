@@ -9,11 +9,15 @@ use Duxbo\Seo\Analysis\Analyzer;
 use Duxbo\Seo\Analysis\DomContentExtractor;
 use Duxbo\Seo\Console\AiToolsCommand;
 use Duxbo\Seo\Console\AuditCommand;
+use Duxbo\Seo\Console\BrokenLinksCommand;
 use Duxbo\Seo\Console\DuplicatesCommand;
+use Duxbo\Seo\Console\GoogleIndexingCommand;
 use Duxbo\Seo\Console\HreflangAuditCommand;
 use Duxbo\Seo\Console\IndexNowCommand;
 use Duxbo\Seo\Console\InternalLinksCommand;
+use Duxbo\Seo\Console\PageSpeedCommand;
 use Duxbo\Seo\Console\PruneNotFoundCommand;
+use Duxbo\Seo\Console\SearchConsoleInspectCommand;
 use Duxbo\Seo\Console\SearchConsoleSyncCommand;
 use Duxbo\Seo\Console\SitemapCommand;
 use Duxbo\Seo\Contracts\CanonicalResolver;
@@ -185,9 +189,13 @@ final class SeoServiceProvider extends ServiceProvider
                 DuplicatesCommand::class,
                 HreflangAuditCommand::class,
                 IndexNowCommand::class,
+                GoogleIndexingCommand::class,
                 AuditCommand::class,
                 InternalLinksCommand::class,
+                BrokenLinksCommand::class,
                 SearchConsoleSyncCommand::class,
+                SearchConsoleInspectCommand::class,
+                PageSpeedCommand::class,
                 AiToolsCommand::class,
             ]);
         }
@@ -451,6 +459,7 @@ final class SeoServiceProvider extends ServiceProvider
                 $app->make(UrlGenerator::class),
                 $app->make(Dispatcher::class),
                 $app->make(Canonical\CanonicalGuard::class),
+                $app->make(Support\TrackingScripts::class),
             );
 
             $head = $app->make(HeadFormatter::class);
@@ -577,6 +586,14 @@ final class SeoServiceProvider extends ServiceProvider
     {
         Blade::directive('seo', static function (string $expression): string {
             return "<?php echo app(\\Duxbo\\Seo\\Seo::class)->render({$expression}); ?>";
+        });
+
+        Blade::directive('seoTrackingHead', static function (): string {
+            return '<?php echo app(\\Duxbo\\Seo\\Seo::class)->trackingHead(); ?>';
+        });
+
+        Blade::directive('seoTrackingBody', static function (): string {
+            return '<?php echo app(\\Duxbo\\Seo\\Seo::class)->trackingBodyOpen(); ?>';
         });
     }
 

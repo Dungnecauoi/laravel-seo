@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Facade;
  * @method static \Duxbo\Seo\Data\SeoContext context(\Duxbo\Seo\Contracts\Seoable $model, ?string $locale = null)
  * @method static \Duxbo\Seo\Data\SeoContext resolve(\Duxbo\Seo\Data\SeoContext $context)
  * @method static \Illuminate\Support\HtmlString render(\Duxbo\Seo\Contracts\Seoable|\Duxbo\Seo\Data\SeoContext|null $subject = null, ?string $locale = null)
+ * @method static \Illuminate\Support\HtmlString trackingHead()
+ * @method static \Illuminate\Support\HtmlString trackingBodyOpen()
  * @method static mixed format(string $formatter, \Duxbo\Seo\Data\SeoContext $context)
  * @method static void save(\Duxbo\Seo\Contracts\Seoable $model, \Duxbo\Seo\Data\SeoData|array $data, ?string $locale = null)
  * @method static void forget(\Duxbo\Seo\Contracts\Seoable $model, ?string $locale = null)

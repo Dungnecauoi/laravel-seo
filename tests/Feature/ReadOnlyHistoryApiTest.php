@@ -52,8 +52,12 @@ final class ReadOnlyHistoryApiTest extends TestCase
 
         $this->getJson('/api/seo/v1/audit-history')->assertForbidden();
         $this->getJson('/api/seo/v1/internal-links')->assertForbidden();
+        $this->getJson('/api/seo/v1/broken-links')->assertForbidden();
         $this->getJson('/api/seo/v1/search-console/stats')->assertForbidden();
+        $this->getJson('/api/seo/v1/search-console/inspections')->assertForbidden();
         $this->getJson('/api/seo/v1/indexnow/log')->assertForbidden();
+        $this->getJson('/api/seo/v1/google-indexing/log')->assertForbidden();
+        $this->getJson('/api/seo/v1/pagespeed/stats')->assertForbidden();
         $this->getJson('/api/seo/v1/ai/tool-calls')->assertForbidden();
     }
 
@@ -103,6 +107,33 @@ final class ReadOnlyHistoryApiTest extends TestCase
         $this->assertSame(1, $rows[$linked->getKey()]['incomingLinks']);
         $this->assertTrue($rows[$orphan->getKey()]['isOrphan']);
         $this->assertSame(1, $rows[$orphan->getKey()]['outgoingLinks']);
+    }
+
+    public function test_broken_links_lists_currently_broken_urls_with_their_citing_sources(): void
+    {
+        $post = Post::query()->create(['name' => 'A', 'slug' => 'bai-a']);
+
+        DB::table('seo_link_checks')->insert([
+            ['url' => 'https://mot-trang-da-mat.com/x', 'url_hash' => md5('https://mot-trang-da-mat.com/x'), 'successful' => false, 'status_code' => 404, 'error' => 'HTTP 404', 'created_at' => now(), 'updated_at' => now()],
+            ['url' => 'https://van-con-song.com/y', 'url_hash' => md5('https://van-con-song.com/y'), 'successful' => true, 'status_code' => 200, 'error' => null, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        DB::table('seo_external_links')->insert([
+            'source_type' => 'post',
+            'source_id' => (string) $post->getKey(),
+            'target_url' => 'https://mot-trang-da-mat.com/x',
+            'target_hash' => md5('https://mot-trang-da-mat.com/x'),
+            'anchor_text' => 'Xem thêm',
+            'created_at' => now(),
+        ]);
+
+        $data = $this->getJson('/api/seo/v1/broken-links')->assertOk()->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame('https://mot-trang-da-mat.com/x', $data[0]['url']);
+        $this->assertSame(404, $data[0]['statusCode']);
+        $this->assertSame('post', $data[0]['sources'][0]['sourceType']);
+        $this->assertSame('Xem thêm', $data[0]['sources'][0]['anchorText']);
     }
 
     public function test_search_console_stats_sums_clicks_per_url_and_excludes_old_rows(): void

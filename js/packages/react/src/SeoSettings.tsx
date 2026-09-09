@@ -219,6 +219,31 @@ export function SeoSettings({ client, className = '' }: SeoSettingsProps) {
             </div>
           </FormGroup>
 
+          <FormGroup title="Tracking scripts (GA4, GTM, Meta Pixel, TikTok Pixel…)">
+            <p className="text-xs text-slate-500">
+              Dán nguyên đoạn script — không phải SEO, package chỉ echo lại nguyên văn vào layout qua{' '}
+              <code>@seoTrackingHead</code> / <code>@seoTrackingBody</code>.
+            </p>
+            <Field
+              label="Head (đặt trong <head>)"
+              textarea
+              mono
+              rows={3}
+              value={String(draft['tracking.head'] ?? '')}
+              onChange={(v) => set('tracking.head', v)}
+              placeholder="<script async src=&quot;https://www.googletagmanager.com/gtag/js?id=G-XXXX&quot;></script>"
+            />
+            <Field
+              label="Body (ngay sau <body>)"
+              textarea
+              mono
+              rows={3}
+              value={String(draft['tracking.body_open'] ?? '')}
+              onChange={(v) => set('tracking.body_open', v)}
+              placeholder="<noscript><iframe src=&quot;https://www.googletagmanager.com/ns.html?id=GTM-XXXX&quot;></iframe></noscript>"
+            />
+          </FormGroup>
+
           <FormGroup title="Robots & Schema.org">
             <Checkbox
               label="Chặn bot huấn luyện AI (GPTBot, ClaudeBot…) trong robots.txt — không ảnh hưởng Googlebot/Bingbot"

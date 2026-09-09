@@ -213,6 +213,42 @@ export const SeoSettings = defineComponent({
                 ]),
               ]),
 
+              formGroup('Tracking scripts (GA4, GTM, Meta Pixel, TikTok Pixel…)', [
+                h(
+                  'p',
+                  { class: 'text-xs text-slate-500' },
+                  [
+                    'Dán nguyên đoạn script — không phải SEO, package chỉ echo lại nguyên văn vào layout qua ',
+                    h('code', '@seoTrackingHead'),
+                    ' / ',
+                    h('code', '@seoTrackingBody'),
+                    '.',
+                  ],
+                ),
+                field(
+                  'Head (đặt trong <head>)',
+                  String(draft['tracking.head'] ?? ''),
+                  (v) => set('tracking.head', v),
+                  {
+                    textarea: true,
+                    mono: true,
+                    rows: 3,
+                    placeholder: '<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXX"></script>',
+                  },
+                ),
+                field(
+                  'Body (ngay sau <body>)',
+                  String(draft['tracking.body_open'] ?? ''),
+                  (v) => set('tracking.body_open', v),
+                  {
+                    textarea: true,
+                    mono: true,
+                    rows: 3,
+                    placeholder: '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-XXXX"></iframe></noscript>',
+                  },
+                ),
+              ]),
+
               formGroup('Robots & Schema.org', [
                 checkbox(
                   'Chặn bot huấn luyện AI (GPTBot, ClaudeBot…) trong robots.txt — không ảnh hưởng Googlebot/Bingbot',

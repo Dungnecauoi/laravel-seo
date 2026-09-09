@@ -29,6 +29,7 @@ use Duxbo\Seo\Resolution\SeoDataBuilder;
 use Duxbo\Seo\Resolution\TokenExpander;
 use Duxbo\Seo\Schema\GraphAssembler;
 use Duxbo\Seo\Schema\SchemaValidator;
+use Duxbo\Seo\Support\TrackingScripts;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\HtmlString;
 
@@ -52,6 +53,7 @@ final class Seo
         private readonly UrlGenerator $urls,
         private readonly Dispatcher $events,
         private readonly CanonicalGuard $canonicalGuard,
+        private readonly TrackingScripts $tracking,
     ) {
     }
 
@@ -131,6 +133,29 @@ final class Seo
         $html = $this->format('html', $context);
 
         return $html;
+    }
+
+    /**
+     * Configured marketing/analytics tags (GA4, GTM, Meta Pixel, TikTok
+     * Pixel, …) for `<head>` — site-wide, unrelated to any specific
+     * record, and unlike {@see render()} not run through the resolution
+     * pipeline at all: this is a trusted pass-through of exactly what
+     * `seo.tracking.head` holds.
+     */
+    public function trackingHead(): HtmlString
+    {
+        return $this->tracking->head();
+    }
+
+    /**
+     * The `seo.tracking.body_open` counterpart to {@see trackingHead()} —
+     * Google Tag Manager's own install instructions ask for a
+     * `<noscript><iframe>` immediately after `<body>` opens, on top of the
+     * head snippet.
+     */
+    public function trackingBodyOpen(): HtmlString
+    {
+        return $this->tracking->bodyOpen();
     }
 
     public function format(string $formatter, SeoContext $context): mixed
