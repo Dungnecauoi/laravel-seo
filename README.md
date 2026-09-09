@@ -12,7 +12,7 @@ stops maintaining.
 
 ## Status
 
-Feature-complete at **0.10**, and not yet 1.0 on purpose: nothing here has run in
+Feature-complete at **0.11**, and not yet 1.0 on purpose: nothing here has run in
 a production site, and that is the only thing that turns a well-built package
 into a hardened one. `Contracts/` stays open until it has.
 

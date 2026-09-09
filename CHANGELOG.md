@@ -6,6 +6,36 @@ only changes in a major release. The rest of `src/` is free to be refactored.
 
 ## Unreleased
 
+## 0.11.0 — 2026-09-09
+
+Found by actually driving the app end-to-end (Testbench plus real HTTP
+calls against seeded data) instead of assuming the read side kept up
+with everything 0.10.0 added.
+
+### Added
+
+- **Dashboard broken-link and indexing counts.** The Dashboard — the
+  first page an admin sees — never mentioned broken links or index
+  status at all after `seo:broken-links` and
+  `seo:search-console:inspect` shipped in 0.10.0; an admin had no way to
+  know either existed without clicking into their own separate pages
+  first. `DashboardController` (API, Panel, and the
+  `seo.dashboard.summary` AI tool) gained `brokenLinksCount`
+  (currently-broken external URLs) and `notIndexedCount` (URLs whose
+  latest Search Console verdict isn't `PASS`) alongside the existing
+  stats.
+- **`ExternalSeoSignals`**, and `externalSignals` on every per-record
+  read (`MetaController::show()`, the Blade panel's data endpoint,
+  `seo.meta.get`). Editing one record showed only its live content
+  score — nothing about whether that exact page has a bad PageSpeed
+  score, isn't indexed, or cites a dead link, even though `seo:audit`
+  already joins all three into a batch report. This is the same three
+  lookups `seo:audit` already had, extracted out of `AuditCommand`
+  rather than duplicated a third time, so the Blade panel, React's
+  `SeoPanel`, Vue's `SeoPanel`, and the AI tool all show it identically.
+  Null means "never checked", not "checked and fine" — the same
+  distinction `seo:audit` itself already draws.
+
 ## 0.10.1 — 2026-09-09
 
 ### Fixed
