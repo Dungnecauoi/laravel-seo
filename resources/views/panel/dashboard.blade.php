@@ -33,6 +33,14 @@
             <div class="seo-stat-value">{{ number_format($sitemapSources) }}</div>
             <div class="seo-stat-label">Nguồn sitemap</div>
         </div>
+        <div class="seo-stat">
+            <div class="seo-stat-value {{ $brokenLinksCount > 0 ? 'is-warn' : '' }}">{{ number_format($brokenLinksCount) }}</div>
+            <div class="seo-stat-label">Link chết chưa sửa</div>
+        </div>
+        <div class="seo-stat">
+            <div class="seo-stat-value {{ $notIndexedCount > 0 ? 'is-warn' : '' }}">{{ number_format($notIndexedCount) }}</div>
+            <div class="seo-stat-label">Chưa được Google index</div>
+        </div>
     </div>
 
     @if ($exposedTypes === [])

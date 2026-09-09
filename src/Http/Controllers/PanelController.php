@@ -7,6 +7,7 @@ namespace Duxbo\Seo\Http\Controllers;
 use Duxbo\Seo\Http\Concerns\ResolvesExposedModel;
 use Duxbo\Seo\Http\Concerns\WarnsAboutDuplicates;
 use Duxbo\Seo\Seo;
+use Duxbo\Seo\Support\ExternalSeoSignals;
 use Duxbo\Seo\Support\SameOriginUrls;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,7 @@ final class PanelController
     public function __construct(
         private readonly Seo $seo,
         private readonly SameOriginUrls $sameOrigin,
+        private readonly ExternalSeoSignals $externalSignals,
     ) {
     }
 
@@ -61,6 +63,7 @@ final class PanelController
             'stored' => $this->seo->repository()->find($model, $locale)?->toArray(),
             'resolved' => $this->seo->for($model, $locale)->toArray(),
             'locales' => $this->seo->repository()->locales($model),
+            'externalSignals' => $this->externalSignals->for($model->seoUrl(), $model),
         ]);
     }
 

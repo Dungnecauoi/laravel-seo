@@ -8,7 +8,7 @@ function stubClient(overrides: Partial<SeoClient> = {}): SeoClient {
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async () => ({ score: 0, locale: null, results: [] }),
-    getMeta: async () => ({ stored: null, resolved: {}, locales: [] }),
+    getMeta: async () => ({ stored: null, resolved: {}, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
     saveMeta: async (_t, _i, data) => ({ resolved: data }),
     deleteMeta: async () => {},
     notFound: async () => [],
@@ -23,6 +23,8 @@ function stubClient(overrides: Partial<SeoClient> = {}): SeoClient {
       activeRedirects: 0,
       notFoundCount: 0,
       sitemapSources: 0,
+      brokenLinksCount: 0,
+      notIndexedCount: 0,
       exposedTypes: [],
     }),
     content: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
@@ -138,7 +140,7 @@ test('reset() returns the draft to what was loaded', async () => {
   await scope.run(async () => {
     const { store, load, set, reset } = useMetaStore(
       stubClient({
-        getMeta: async () => ({ stored: { title: 'Gốc' }, resolved: {}, locales: [] }),
+        getMeta: async () => ({ stored: { title: 'Gốc' }, resolved: {}, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
       }),
       { type: 'post', id: 1 },
     )

@@ -6,6 +6,7 @@ namespace Duxbo\Seo\Http\Api\V1;
 
 use Duxbo\Seo\Http\Concerns\WarnsAboutDuplicates;
 use Duxbo\Seo\Seo;
+use Duxbo\Seo\Support\ExternalSeoSignals;
 use Duxbo\Seo\Support\SameOriginUrls;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ final class MetaController extends ApiController
     public function __construct(
         private readonly Seo $seo,
         private readonly SameOriginUrls $sameOrigin,
+        private readonly ExternalSeoSignals $externalSignals,
     ) {
     }
 
@@ -29,6 +31,7 @@ final class MetaController extends ApiController
             'stored' => $this->seo->repository()->find($model, is_string($locale) ? $locale : null)?->toArray(),
             'resolved' => $this->seo->for($model, is_string($locale) ? $locale : null)->toArray(),
             'locales' => $this->seo->repository()->locales($model),
+            'externalSignals' => $this->externalSignals->for($model->seoUrl(), $model),
         ]);
     }
 

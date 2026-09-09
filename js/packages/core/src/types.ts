@@ -66,12 +66,26 @@ export interface AnalysisReport {
   results: CheckResult[]
 }
 
+/**
+ * The same three "has anything already checked this page" signals a batch
+ * `seo:audit` joins in, for one specific record — never a live check of its
+ * own, only whatever `seo:pagespeed` / `seo:search-console:inspect` /
+ * `seo:broken-links` already stored. `null` on any field means "never
+ * checked", not "checked and fine".
+ */
+export interface ExternalSeoSignals {
+  pagespeedScore: number | null
+  gscVerdict: string | null
+  brokenLinksCount: number | null
+}
+
 export interface MetaResponse {
   /** What was entered, or null when nothing has been. */
   stored: SeoData | null
   /** What will actually be published, after the fallback chain runs. */
   resolved: SeoData
   locales: string[]
+  externalSignals: ExternalSeoSignals
 }
 
 export interface NotFoundEntry {
@@ -103,6 +117,10 @@ export interface DashboardStats {
   activeRedirects: number
   notFoundCount: number
   sitemapSources: number
+  /** Currently-known-broken external URLs, from the last `seo:broken-links` run. */
+  brokenLinksCount: number
+  /** URLs whose latest Search Console verdict isn't PASS, from the last `seo:search-console:inspect` run. */
+  notIndexedCount: number
   exposedTypes: string[]
 }
 

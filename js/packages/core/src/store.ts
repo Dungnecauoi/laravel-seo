@@ -1,5 +1,5 @@
 import type { SeoClient } from './client.js'
-import type { AnalysisReport, SeoData } from './types.js'
+import type { AnalysisReport, ExternalSeoSignals, SeoData } from './types.js'
 
 export interface MetaStoreTarget {
   type: string
@@ -27,6 +27,8 @@ export interface MetaStore {
   readonly stored: SeoData | null
   /** What will be published, including everything the fallback chain supplies. */
   readonly resolved: SeoData | null
+  /** PageSpeed/Search Console/broken-link signals already stored for this record's URL — null fields mean "never checked". */
+  readonly externalSignals: ExternalSeoSignals | null
   readonly report: AnalysisReport | null
   readonly isDirty: boolean
   readonly isLoading: boolean
@@ -52,6 +54,7 @@ export function createMetaStore(
   let draft: SeoData = {}
   let stored: SeoData | null = null
   let resolved: SeoData | null = null
+  let externalSignals: ExternalSeoSignals | null = null
   let report: AnalysisReport | null = null
   let isLoading = false
   let isSaving = false
@@ -72,6 +75,9 @@ export function createMetaStore(
     },
     get resolved() {
       return resolved
+    },
+    get externalSignals() {
+      return externalSignals
     },
     get report() {
       return report
@@ -101,6 +107,7 @@ export function createMetaStore(
         const response = await client.getMeta(target.type, target.id, target.locale)
         stored = response.stored
         resolved = response.resolved
+        externalSignals = response.externalSignals
         draft = { ...(response.stored ?? {}) }
       } catch (e) {
         error = e instanceof Error ? e : new Error(String(e))

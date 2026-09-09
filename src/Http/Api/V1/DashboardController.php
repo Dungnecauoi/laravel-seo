@@ -53,7 +53,40 @@ final class DashboardController extends ApiController
             'activeRedirects' => Redirect::query()->where('is_active', true)->count(),
             'notFoundCount' => DB::table((string) config('seo.not_found.table', 'seo_not_found'))->count(),
             'sitemapSources' => count($this->sitemap->sources()),
+            'brokenLinksCount' => $this->brokenLinksCount(),
+            'notIndexedCount' => $this->notIndexedCount(),
             'exposedTypes' => $exposed,
         ]);
+    }
+
+    /**
+     * Currently-known-broken external URLs, from whatever `seo:broken-links`
+     * last checked — the same count {@see BrokenLinksController} lists.
+     */
+    private function brokenLinksCount(): int
+    {
+        $table = (string) config('seo.broken_links.checks_table', 'seo_link_checks');
+
+        return DB::table($table)->where('successful', false)->count();
+    }
+
+    /**
+     * URLs whose latest stored Search Console verdict is not PASS — from
+     * whatever `seo:search-console:inspect` last checked. A URL never
+     * inspected contributes to neither this nor a "fine" count, since
+     * "unknown" and "fine" are not the same claim.
+     */
+    private function notIndexedCount(): int
+    {
+        $table = (string) config('seo.search_console.inspections_table', 'seo_url_inspections');
+
+        $latestIds = DB::table($table)
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('url_hash');
+
+        return DB::table($table)
+            ->joinSub($latestIds, 'latest', "{$table}.id", '=', 'latest.id')
+            ->where('verdict', '!=', 'PASS')
+            ->count();
     }
 }

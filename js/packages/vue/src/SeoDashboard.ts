@@ -58,12 +58,14 @@ export const SeoDashboard = defineComponent({
             ],
           ),
 
-        h('div', { class: 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5' }, [
+        h('div', { class: 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7' }, [
           stat(s.totalRecords, 'Bản ghi có SEO'),
           stat(s.totalMissing, 'Chưa có meta riêng', s.totalMissing > 0),
           stat(s.activeRedirects, 'Redirect đang bật'),
           stat(s.notFoundCount, 'Link 404 ghi nhận', s.notFoundCount > 0),
           stat(s.sitemapSources, 'Nguồn sitemap'),
+          stat(s.brokenLinksCount, 'Link chết chưa sửa', s.brokenLinksCount > 0),
+          stat(s.notIndexedCount, 'Chưa được Google index', s.notIndexedCount > 0),
         ]),
 
         s.exposedTypes.length === 0

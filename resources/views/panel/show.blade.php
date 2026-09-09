@@ -73,6 +73,21 @@
         </div>
         <ul class="seo-checks" id="seo-checks" hidden></ul>
 
+        <div id="seo-signals" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:20px" hidden>
+            <div>
+                <p style="margin:0;font-size:12px;color:#64748b">PageSpeed (mobile)</p>
+                <p style="margin:2px 0 0;font-weight:600" id="seo-signal-pagespeed">Chưa kiểm tra</p>
+            </div>
+            <div>
+                <p style="margin:0;font-size:12px;color:#64748b">Search Console</p>
+                <p style="margin:2px 0 0;font-weight:600" id="seo-signal-gsc">Chưa kiểm tra</p>
+            </div>
+            <div>
+                <p style="margin:0;font-size:12px;color:#64748b">Link chết</p>
+                <p style="margin:2px 0 0;font-weight:600" id="seo-signal-broken">Chưa kiểm tra</p>
+            </div>
+        </div>
+
         <div class="seo-actions">
             <button type="button" class="seo-btn seo-btn-primary" id="seo-save" disabled>Lưu</button>
             <button type="button" class="seo-btn seo-btn-secondary" id="seo-reset" disabled>Hoàn tác</button>
@@ -109,6 +124,10 @@
             scoreNote: document.getElementById('seo-score-note'),
             scoreArc: document.getElementById('seo-score-arc'),
             checks: document.getElementById('seo-checks'),
+            signals: document.getElementById('seo-signals'),
+            signalPagespeed: document.getElementById('seo-signal-pagespeed'),
+            signalGsc: document.getElementById('seo-signal-gsc'),
+            signalBroken: document.getElementById('seo-signal-broken'),
             save: document.getElementById('seo-save'),
             reset: document.getElementById('seo-reset'),
             dirtyFlag: document.getElementById('seo-dirty-flag'),
@@ -230,6 +249,31 @@
             });
         }
 
+        // PageSpeed/Search Console/broken-link signals already stored for
+        // this record's URL — never a live check of its own, only whatever
+        // seo:pagespeed / seo:search-console:inspect / seo:broken-links last
+        // found. A null field stays "Chưa kiểm tra" (never checked), never a
+        // misleading "0" or "OK".
+        function renderExternalSignals(signals) {
+            if (!signals) { els.signals.hidden = true; return; }
+
+            els.signals.hidden = false;
+
+            els.signalPagespeed.textContent = signals.pagespeedScore === null
+                ? 'Chưa kiểm tra' : signals.pagespeedScore + '/100';
+            els.signalPagespeed.style.color = signals.pagespeedScore === null ? '#94a3b8'
+                : signals.pagespeedScore >= 90 ? '#059669' : signals.pagespeedScore >= 50 ? '#d97706' : '#dc2626';
+
+            els.signalGsc.textContent = signals.gscVerdict === null ? 'Chưa kiểm tra' : signals.gscVerdict;
+            els.signalGsc.style.color = signals.gscVerdict === null ? '#94a3b8'
+                : signals.gscVerdict === 'PASS' ? '#059669' : '#dc2626';
+
+            els.signalBroken.textContent = signals.brokenLinksCount === null
+                ? 'Chưa kiểm tra' : String(signals.brokenLinksCount);
+            els.signalBroken.style.color = signals.brokenLinksCount === null ? '#94a3b8'
+                : signals.brokenLinksCount > 0 ? '#dc2626' : '#059669';
+        }
+
         function scheduleAnalyze() {
             if (analyzeTimer) clearTimeout(analyzeTimer);
 
@@ -257,6 +301,8 @@
                 els.title.value = draft.title || '';
                 els.description.value = draft.description || '';
                 els.keyword.value = draft.focusKeyword || '';
+
+                renderExternalSignals(data.externalSignals);
 
                 syncHints();
                 syncButtons();

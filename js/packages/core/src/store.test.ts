@@ -8,7 +8,7 @@ function stubClient(overrides: Partial<SeoClient> = {}): SeoClient {
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async (): Promise<AnalysisReport> => ({ score: 50, locale: null, results: [] }),
-    getMeta: async (): Promise<MetaResponse> => ({ stored: null, resolved: {}, locales: [] }),
+    getMeta: async (): Promise<MetaResponse> => ({ stored: null, resolved: {}, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
     saveMeta: async (_t, _i, data): Promise<{ resolved: SeoData }> => ({ resolved: data }),
     deleteMeta: async () => {},
     notFound: async () => [],
@@ -23,6 +23,8 @@ function stubClient(overrides: Partial<SeoClient> = {}): SeoClient {
       activeRedirects: 0,
       notFoundCount: 0,
       sitemapSources: 0,
+      brokenLinksCount: 0,
+      notIndexedCount: 0,
       exposedTypes: [],
     }),
     content: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
@@ -66,7 +68,7 @@ const target = { type: 'post', id: 1 }
 test('the draft starts from what was stored', async () => {
   const store = createMetaStore(
     stubClient({
-      getMeta: async () => ({ stored: { title: 'Đã lưu' }, resolved: { title: 'Đã lưu' }, locales: [] }),
+      getMeta: async () => ({ stored: { title: 'Đã lưu' }, resolved: { title: 'Đã lưu' }, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
     }),
     target,
   )
@@ -89,7 +91,7 @@ test('editing a field marks the store dirty', async () => {
 test('switching between empty and unset is not an edit', async () => {
   const store = createMetaStore(
     stubClient({
-      getMeta: async () => ({ stored: { title: 'x' }, resolved: {}, locales: [] }),
+      getMeta: async () => ({ stored: { title: 'x' }, resolved: {}, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
     }),
     target,
   )
@@ -105,7 +107,7 @@ test('switching between empty and unset is not an edit', async () => {
 test('reset returns the draft to what was stored', async () => {
   const store = createMetaStore(
     stubClient({
-      getMeta: async () => ({ stored: { title: 'Gốc' }, resolved: {}, locales: [] }),
+      getMeta: async () => ({ stored: { title: 'Gốc' }, resolved: {}, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
     }),
     target,
   )

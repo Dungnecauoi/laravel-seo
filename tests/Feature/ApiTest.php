@@ -92,6 +92,45 @@ final class ApiTest extends TestCase
             ->assertJsonPath('stored.title', 'Tiêu đề từ API');
     }
 
+    public function test_meta_includes_external_signals_joined_from_stored_checks(): void
+    {
+        $this->allow();
+        $post = $this->makePost();
+
+        // Nothing has checked this URL yet — every field must read null,
+        // never a misleadingly cheerful zero.
+        $this->getJson("/api/seo/v1/meta/post/{$post->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('externalSignals.pagespeedScore', null)
+            ->assertJsonPath('externalSignals.gscVerdict', null)
+            ->assertJsonPath('externalSignals.brokenLinksCount', null);
+
+        DB::table('seo_pagespeed_stats')->insert([
+            'url' => $post->seoUrl(), 'url_hash' => md5($post->seoUrl()), 'strategy' => 'mobile',
+            'date' => now()->toDateString(), 'performance_score' => 77,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('seo_url_inspections')->insert([
+            'url' => $post->seoUrl(), 'url_hash' => md5($post->seoUrl()), 'date' => now()->toDateString(),
+            'verdict' => 'PASS', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('seo_external_links')->insert([
+            'source_type' => $post->seoType(), 'source_id' => (string) $post->getKey(),
+            'target_url' => 'https://mot-trang-da-mat.com/x', 'target_hash' => md5('https://mot-trang-da-mat.com/x'),
+            'created_at' => now(),
+        ]);
+        DB::table('seo_link_checks')->insert([
+            'url' => 'https://mot-trang-da-mat.com/x', 'url_hash' => md5('https://mot-trang-da-mat.com/x'),
+            'successful' => false, 'status_code' => 404, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->getJson("/api/seo/v1/meta/post/{$post->getKey()}")
+            ->assertOk()
+            ->assertJsonPath('externalSignals.pagespeedScore', 77)
+            ->assertJsonPath('externalSignals.gscVerdict', 'PASS')
+            ->assertJsonPath('externalSignals.brokenLinksCount', 1);
+    }
+
     public function test_a_type_outside_the_allowlist_is_rejected(): void
     {
         $this->allow();

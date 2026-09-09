@@ -9,6 +9,7 @@ use Duxbo\Seo\Data\AiToolContext;
 use Duxbo\Seo\Enums\AiToolRisk;
 use Duxbo\Seo\Http\Concerns\ResolvesExposedModel;
 use Duxbo\Seo\Seo;
+use Duxbo\Seo\Support\ExternalSeoSignals;
 
 /**
  * The AI-facing twin of {@see \Duxbo\Seo\Http\Api\V1\MetaController::show()}
@@ -19,8 +20,10 @@ final class GetMetaTool implements AiTool
 {
     use ResolvesExposedModel;
 
-    public function __construct(private readonly Seo $seo)
-    {
+    public function __construct(
+        private readonly Seo $seo,
+        private readonly ExternalSeoSignals $externalSignals,
+    ) {
     }
 
     public function name(): string
@@ -60,6 +63,7 @@ final class GetMetaTool implements AiTool
             'stored' => $this->seo->repository()->find($model, $locale)?->toArray(),
             'resolved' => $this->seo->for($model, $locale)->toArray(),
             'locales' => $this->seo->repository()->locales($model),
+            'externalSignals' => $this->externalSignals->for($model->seoUrl(), $model),
         ];
     }
 }

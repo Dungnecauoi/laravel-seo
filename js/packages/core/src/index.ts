@@ -24,6 +24,7 @@ export type {
   DashboardStats,
   DynamicSettingValue,
   DynamicSettingsResponse,
+  ExternalSeoSignals,
   GoogleIndexingLogEntry,
   GoogleIndexingLogResponse,
   IndexNowLogEntry,

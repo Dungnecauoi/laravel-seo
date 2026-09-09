@@ -8,7 +8,7 @@ function stubClient(dashboard: () => Promise<DashboardStats>): SeoClient {
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async () => ({ score: 0, locale: null, results: [] }),
-    getMeta: async () => ({ stored: null, resolved: {}, locales: [] }),
+    getMeta: async () => ({ stored: null, resolved: {}, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
     saveMeta: async (_t, _i, data) => ({ resolved: data }),
     deleteMeta: async () => {},
     notFound: async () => [],
@@ -59,6 +59,8 @@ const baseStats: DashboardStats = {
   activeRedirects: 2,
   notFoundCount: 1,
   sitemapSources: 1,
+  brokenLinksCount: 7,
+  notIndexedCount: 9,
   exposedTypes: ['post'],
 }
 
@@ -73,6 +75,21 @@ test('renders the fetched stats once loaded', async () => {
   const text = renderer!.toJSON() as unknown as string
   assert.ok(JSON.stringify(text).includes('12'))
   assert.ok(JSON.stringify(text).includes('post'))
+})
+
+test('renders the broken-links and not-indexed counts', async () => {
+  const client = stubClient(async () => baseStats)
+  let renderer: ReturnType<typeof create>
+
+  await act(async () => {
+    renderer = create(<SeoDashboard client={client} />)
+  })
+
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('Link chết chưa sửa'))
+  assert.ok(json.includes('Chưa được Google index'))
+  assert.ok(json.includes('"7"'))
+  assert.ok(json.includes('"9"'))
 })
 
 test('shows the demo-domain warning only when seoEnabled is false', async () => {

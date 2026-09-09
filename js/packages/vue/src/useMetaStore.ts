@@ -1,6 +1,13 @@
 import { type MaybeRefOrGetter, getCurrentInstance, onUnmounted, reactive, shallowRef, toValue, watch } from 'vue'
 import { createMetaStore } from '@duxbo/seo-core'
-import type { AnalysisReport, MetaStoreOptions, MetaStoreTarget, SeoClient, SeoData } from '@duxbo/seo-core'
+import type {
+  AnalysisReport,
+  ExternalSeoSignals,
+  MetaStoreOptions,
+  MetaStoreTarget,
+  SeoClient,
+  SeoData,
+} from '@duxbo/seo-core'
 
 /**
  * The readonly half of MetaStore — what `reactive()` wraps. Kept separate
@@ -12,6 +19,7 @@ export interface MetaStoreState {
   draft: SeoData
   stored: SeoData | null
   resolved: SeoData | null
+  externalSignals: ExternalSeoSignals | null
   report: AnalysisReport | null
   isDirty: boolean
   isLoading: boolean
@@ -103,6 +111,7 @@ function snapshot(store: {
   draft: SeoData
   stored: SeoData | null
   resolved: SeoData | null
+  externalSignals: ExternalSeoSignals | null
   report: AnalysisReport | null
   isDirty: boolean
   isLoading: boolean
@@ -114,6 +123,7 @@ function snapshot(store: {
     draft: store.draft,
     stored: store.stored,
     resolved: store.resolved,
+    externalSignals: store.externalSignals,
     report: store.report,
     isDirty: store.isDirty,
     isLoading: store.isLoading,

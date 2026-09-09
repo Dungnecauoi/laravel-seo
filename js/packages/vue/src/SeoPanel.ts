@@ -1,5 +1,5 @@
 import { defineComponent, h, type PropType, watch } from 'vue'
-import type { AnalysisReport, CheckResult, MetaStoreTarget, SeoClient } from '@duxbo/seo-core'
+import type { AnalysisReport, CheckResult, ExternalSeoSignals, MetaStoreTarget, SeoClient } from '@duxbo/seo-core'
 import { useMetaStore } from './useMetaStore.js'
 
 /**
@@ -98,6 +98,8 @@ export const SeoPanel = defineComponent({
 
         props.content !== undefined && scorePanel(store.report, store.isAnalyzing),
 
+        store.externalSignals && externalSignalsPanel(store.externalSignals),
+
         h('div', { class: 'flex items-center gap-3 border-t border-slate-100 pt-4' }, [
           h(
             'button',
@@ -163,6 +165,52 @@ function scorePanel(report: AnalysisReport | null, loading: boolean) {
         { class: 'mt-3 space-y-1.5 border-t border-slate-100 pt-3' },
         problems.map((result) => checkRow(result)),
       ),
+  ])
+}
+
+/**
+ * PageSpeed/Search Console/broken-link signals already stored for this
+ * record's URL — never a live check of its own, only whatever `seo:pagespeed`
+ * / `seo:search-console:inspect` / `seo:broken-links` last found. A null
+ * field reads "Chưa kiểm tra" (never checked), never a misleading "0" or "OK".
+ */
+function externalSignalsPanel(signals: ExternalSeoSignals) {
+  return h('div', { class: 'grid grid-cols-1 gap-2 rounded-md border border-slate-200 p-4 sm:grid-cols-3' }, [
+    signalStat(
+      'PageSpeed (mobile)',
+      signals.pagespeedScore === null ? null : `${signals.pagespeedScore}/100`,
+      signals.pagespeedScore === null
+        ? 'neutral'
+        : signals.pagespeedScore >= 90
+          ? 'ok'
+          : signals.pagespeedScore >= 50
+            ? 'warn'
+            : 'bad',
+    ),
+    signalStat(
+      'Search Console',
+      signals.gscVerdict,
+      signals.gscVerdict === null ? 'neutral' : signals.gscVerdict === 'PASS' ? 'ok' : 'bad',
+    ),
+    signalStat(
+      'Link chết',
+      signals.brokenLinksCount === null ? null : String(signals.brokenLinksCount),
+      signals.brokenLinksCount === null ? 'neutral' : signals.brokenLinksCount > 0 ? 'bad' : 'ok',
+    ),
+  ])
+}
+
+function signalStat(label: string, value: string | null, tone: 'ok' | 'warn' | 'bad' | 'neutral') {
+  const classes = {
+    ok: 'text-emerald-700',
+    warn: 'text-amber-700',
+    bad: 'text-red-700',
+    neutral: 'text-slate-400',
+  }[tone]
+
+  return h('div', {}, [
+    h('p', { class: 'text-xs text-slate-500' }, label),
+    h('p', { class: `text-sm font-medium ${classes}` }, value ?? 'Chưa kiểm tra'),
   ])
 }
 

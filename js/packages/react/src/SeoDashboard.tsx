@@ -60,12 +60,14 @@ export function SeoDashboard({ client, onSelectType, className = '' }: SeoDashbo
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         <Stat value={stats.totalRecords} label="Bản ghi có SEO" />
         <Stat value={stats.totalMissing} label="Chưa có meta riêng" warn={stats.totalMissing > 0} />
         <Stat value={stats.activeRedirects} label="Redirect đang bật" />
         <Stat value={stats.notFoundCount} label="Link 404 ghi nhận" warn={stats.notFoundCount > 0} />
         <Stat value={stats.sitemapSources} label="Nguồn sitemap" />
+        <Stat value={stats.brokenLinksCount} label="Link chết chưa sửa" warn={stats.brokenLinksCount > 0} />
+        <Stat value={stats.notIndexedCount} label="Chưa được Google index" warn={stats.notIndexedCount > 0} />
       </div>
 
       {stats.exposedTypes.length === 0 ? (

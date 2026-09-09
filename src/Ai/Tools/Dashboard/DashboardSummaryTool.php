@@ -37,7 +37,8 @@ final class DashboardSummaryTool implements AiTool
 
     public function description(): string
     {
-        return 'Site-wide SEO snapshot: records with/without metadata by type, active redirects, 404 count, sitemap sources.';
+        return 'Site-wide SEO snapshot: records with/without metadata by type, active redirects, 404 count, '
+            .'sitemap sources, currently-broken external links, and URLs not passing their last Search Console check.';
     }
 
     public function inputSchema(): array
@@ -76,7 +77,39 @@ final class DashboardSummaryTool implements AiTool
             'activeRedirects' => Redirect::query()->where('is_active', true)->count(),
             'notFoundCount' => DB::table((string) config('seo.not_found.table', 'seo_not_found'))->count(),
             'sitemapSources' => count($this->sitemap->sources()),
+            'brokenLinksCount' => $this->brokenLinksCount(),
+            'notIndexedCount' => $this->notIndexedCount(),
             'exposedTypes' => $exposed,
         ];
+    }
+
+    /**
+     * Currently-known-broken external URLs, from whatever `seo:broken-links`
+     * last checked.
+     */
+    private function brokenLinksCount(): int
+    {
+        $table = (string) config('seo.broken_links.checks_table', 'seo_link_checks');
+
+        return DB::table($table)->where('successful', false)->count();
+    }
+
+    /**
+     * URLs whose latest stored Search Console verdict is not PASS — from
+     * whatever `seo:search-console:inspect` last checked. A URL never
+     * inspected contributes to neither this nor a "fine" count.
+     */
+    private function notIndexedCount(): int
+    {
+        $table = (string) config('seo.search_console.inspections_table', 'seo_url_inspections');
+
+        $latestIds = DB::table($table)
+            ->selectRaw('MAX(id) as id')
+            ->groupBy('url_hash');
+
+        return DB::table($table)
+            ->joinSub($latestIds, 'latest', "{$table}.id", '=', 'latest.id')
+            ->where('verdict', '!=', 'PASS')
+            ->count();
     }
 }

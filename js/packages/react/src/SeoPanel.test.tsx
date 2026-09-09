@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { act, create } from 'react-test-renderer'
-import type { ContentListResponse, SeoClient } from '@duxbo/seo-core'
-import { SeoContentList } from './SeoContentList.js'
+import type { ExternalSeoSignals, MetaResponse, SeoClient } from '@duxbo/seo-core'
+import { SeoPanel } from './SeoPanel.js'
 
-function stubClient(content: (type?: string, page?: number) => Promise<ContentListResponse>): SeoClient {
+function stubClient(externalSignals: ExternalSeoSignals): SeoClient {
+  const meta: MetaResponse = { stored: null, resolved: {}, locales: [], externalSignals }
+
   return {
     resolve: async () => ({ url: '/x', locale: null }),
     analyze: async () => ({ score: 0, locale: null, results: [] }),
-    getMeta: async () => ({ stored: null, resolved: {}, locales: [], externalSignals: { pagespeedScore: null, gscVerdict: null, brokenLinksCount: null } }),
+    getMeta: async () => meta,
     saveMeta: async (_t, _i, data) => ({ resolved: data }),
     deleteMeta: async () => {},
     notFound: async () => [],
@@ -27,7 +29,7 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
       notIndexedCount: 0,
       exposedTypes: [],
     }),
-    content,
+    content: async () => ({ exposedTypes: [], type: null, data: [], meta: null }),
     settings: async () => ({
       seoEnabled: true,
       indexableEnvironments: [],
@@ -62,59 +64,45 @@ function stubClient(content: (type?: string, page?: number) => Promise<ContentLi
   }
 }
 
-test('shows an untitled record with the fallback pill rather than a blank cell', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 1, title: null, description: null, robots: null, url: '/trong' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
+test('renders PageSpeed, Search Console, and broken-link signals once loaded', async () => {
+  const client = stubClient({ pagespeedScore: 96, gscVerdict: 'PASS', brokenLinksCount: 0 })
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
+    renderer = create(<SeoPanel client={client} target={{ type: 'post', id: 1 }} />)
   })
 
-  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Chưa có tiêu đề'))
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('96/100'))
+  assert.ok(json.includes('PASS'))
+  assert.ok(json.includes('PageSpeed'))
+  assert.ok(json.includes('Search Console'))
+  assert.ok(json.includes('Link chết'))
 })
 
-test('onEdit receives the row type and id', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 42, title: 'Bài viết', description: null, robots: null, url: '/bai-viet' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
+test('a never-checked signal reads "Chưa kiểm tra", not a misleading zero', async () => {
+  const client = stubClient({ pagespeedScore: null, gscVerdict: null, brokenLinksCount: null })
 
-  const edits: [string, string | number][] = []
   let renderer: ReturnType<typeof create>
-
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" onEdit={(t, id) => edits.push([t, id])} />)
+    renderer = create(<SeoPanel client={client} target={{ type: 'post', id: 1 }} />)
   })
 
-  const button = renderer!.root.findByProps({ children: 'Sửa' })
-
-  act(() => {
-    button.props.onClick()
-  })
-
-  assert.deepEqual(edits, [['post', 42]])
+  const json = JSON.stringify(renderer!.toJSON())
+  const occurrences = json.split('Chưa kiểm tra').length - 1
+  assert.equal(occurrences, 3)
 })
 
-test('paging past the last page is disabled', async () => {
-  const client = stubClient(async () => ({
-    exposedTypes: ['post'],
-    type: 'post',
-    data: [{ id: 1, title: 'x', description: null, robots: null, url: '/x' }],
-    meta: { currentPage: 1, lastPage: 1, total: 1 },
-  }))
+test('a broken link count above zero renders distinctly from a clean page', async () => {
+  const client = stubClient({ pagespeedScore: 42, gscVerdict: 'FAIL', brokenLinksCount: 3 })
 
   let renderer: ReturnType<typeof create>
   await act(async () => {
-    renderer = create(<SeoContentList client={client} type="post" />)
+    renderer = create(<SeoPanel client={client} target={{ type: 'post', id: 1 }} />)
   })
 
-  // A single page renders no pager at all.
-  assert.equal(renderer!.root.findAllByProps({ children: 'Sau →' }).length, 0)
+  const json = JSON.stringify(renderer!.toJSON())
+  assert.ok(json.includes('"3"'))
+  assert.ok(json.includes('42/100'))
+  assert.ok(json.includes('FAIL'))
 })
