@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Duxbo\Seo\Tests\Unit;
 
 use Duxbo\Seo\BrokenLinks\PublicUrlGuard;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class PublicUrlGuardTest extends TestCase
 {
-    /**
-     * @dataProvider blockedLiteralIpProvider
-     */
+    #[DataProvider('blockedLiteralIpProvider')]
     public function test_blocks_a_literal_private_loopback_or_link_local_ip(string $url): void
     {
         // The resolver answers with a public IP no matter what it's asked —
