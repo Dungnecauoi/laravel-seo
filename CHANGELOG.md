@@ -6,6 +6,21 @@ only changes in a major release. The rest of `src/` is free to be refactored.
 
 ## Unreleased
 
+## 0.10.1 — 2026-09-09
+
+### Fixed
+
+- **`PublicUrlGuardTest`'s data provider**, unusable under PHPUnit 12 (what
+  this package's own `composer.json` range resolves to): the
+  `@dataProvider` doc-comment annotation was dropped in favour of the
+  `#[DataProvider]` attribute, and PHPUnit 12 no longer falls back to the
+  old form — it calls the test method with zero arguments instead, which
+  threw an `ArgumentCountError`. Every other test across the new features
+  in 0.10.0 passed on the first real run against this package's own test
+  suite (only just possible locally, now that `duxbo/laravel-ai-core` is
+  available to resolve); this was the one thing 0.10.0 shipped with a
+  broken test file, caught the moment the suite could actually run.
+
 ## 0.10.0 — 2026-09-09
 
 Fills the gaps between this package and a paid all-in-one SEO suite,
