@@ -6,6 +6,66 @@ only changes in a major release. The rest of `src/` is free to be refactored.
 
 ## Unreleased
 
+## 0.12.0 — 2026-09-10
+
+### Added — a decoupled SPA front end can report its own 404s, browse the real internal-link graph, and read Search Console as a time series
+
+Four gaps found auditing this package against a real production site whose
+front end is a separately-deployed Next.js app, never proxied through
+Laravel.
+
+- **404 ingest endpoint.** `HandleNotFound` middleware only ever recorded a
+  404 that flowed through *this* application's own router — a decoupled
+  front end's real 404s never reached `seo_not_found` at all. New
+  `POST {api.prefix}/not-found` accepts `{path, referrer?, userAgent?}`
+  from that front end's own backend, authenticated by a new
+  `seo.not_found.ingest_token` (bare shared secret, header
+  `X-Seo-Ingest-Token`, compared with `hash_equals()` — there is no
+  Laravel session for a server-to-server caller to hold). The route is
+  only ever registered when the token is configured, and lives in
+  `routes/seo.php` rather than the admin API group, so it works even with
+  `seo.api.enabled` false. **Breaking**: `NotFoundLogger::log()` now takes
+  a new `Data\NotFoundHit` value object instead of `Illuminate\Http\Request`,
+  and `Events\NotFoundLogged::$request` is renamed to `$hit` of that same
+  type — any listener reading `$event->request` directly needs updating.
+- **Internal Links: a real link-detail endpoint.** `seo:internal-links`
+  already wrote genuine source→target rows into `seo_internal_links`; the
+  read API only ever exposed aggregated incoming/outgoing counts. New
+  `GET {api.prefix}/internal-links/detail` (optionally `?type=`,
+  `?locale=`) returns the actual rows, with each source's `seoUrl()`
+  resolved batched by type rather than per row.
+  Also fixed, found during this same audit: crawling one locale used to
+  **delete another locale's rows** for the same record — the delete-before-
+  insert step filtered only by `source_type`/`source_id`, with no way to
+  address one locale's rows independently, since the table had no `locale`
+  column at all. `seo_internal_links` gains a nullable `locale` column;
+  `seo:internal-links` gains a `--locale=` option (temporarily switches the
+  app locale while crawling, restored afterward — safe to call mid-request
+  via `RunInternalLinksCommandTool`); both `internal-links` endpoints
+  accept `?locale=` to keep incoming/outgoing counts from mixing rows a
+  per-locale crawl kept separate on purpose.
+- **Search Console: genuine time-series endpoints.** The sync command
+  already stored one row per (url, date); the read API summed the whole
+  requested window away before returning it, so no chart could be drawn
+  from it. New `GET {api.prefix}/search-console/stats/timeseries?url=&days=`
+  (day-by-day rows for one URL) and `GET {api.prefix}/search-console/stats/daily?days=`
+  (site-wide daily totals, `GROUP BY date` instead of `index()`'s
+  `GROUP BY url`). The existing `index()` aggregate is unchanged.
+- **Dynamic Settings: operational config that was code-only.** Following
+  this package's own "settable at runtime, no deploy" principle for
+  anything an end-user has a legitimate ongoing reason to tune: added
+  `not_found.enabled`, `not_found.sample_rate`, `not_found.max_rows`,
+  `not_found.exclude`, `not_found.ingest_token` (secret), `redirects.enabled`,
+  `redirects.eager`, `redirects.keep_query`, `redirects.allowed_hosts` to
+  the allowlist. New validators: `IntegerSettingValidator`,
+  `SampleRateSettingValidator` (0.0–1.0), `RegexListSettingValidator`
+  (rejects the same nested-quantifier ReDoS shape `RedirectGuard` already
+  refuses for a stored redirect rule — extracted into a shared
+  `Support\CatastrophicPattern`), `HostListSettingValidator` (bare
+  hostnames, distinct from the existing `UrlListSettingValidator` which
+  requires a full `http(s)://` URL and doesn't fit
+  `SameOriginUrls::allowedHosts()`'s bare-host comparison).
+
 ## 0.11.0 — 2026-09-09
 
 Found by actually driving the app end-to-end (Testbench plus real HTTP

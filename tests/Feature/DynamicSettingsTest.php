@@ -145,6 +145,95 @@ final class DynamicSettingsTest extends TestCase
         $this->assertNull(config('seo.verification.google'));
     }
 
+    public function test_not_found_ingest_token_is_writable_and_marked_secret(): void
+    {
+        $this->repo()->set('not_found.ingest_token', 'a-secret-token');
+
+        $this->assertSame('a-secret-token', config('seo.not_found.ingest_token'));
+        $this->assertTrue($this->repo()->isSecret('not_found.ingest_token'));
+    }
+
+    public function test_a_sample_rate_setting_rejects_a_value_outside_zero_to_one(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('not_found.sample_rate', 1.5);
+    }
+
+    public function test_a_sample_rate_setting_accepts_the_boundary_values(): void
+    {
+        // A JSON round trip through the settings table does not preserve
+        // 0.0 as distinct from the integer 0 — the validator itself
+        // accepts either shape, so the assertion compares numerically.
+        $this->repo()->set('not_found.sample_rate', 0.0);
+        $this->assertEquals(0.0, config('seo.not_found.sample_rate'));
+
+        $this->repo()->set('not_found.sample_rate', 1);
+        $this->assertEquals(1.0, config('seo.not_found.sample_rate'));
+    }
+
+    public function test_an_integer_setting_rejects_a_non_integer_value(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('not_found.max_rows', 'a lot');
+    }
+
+    public function test_an_integer_setting_accepts_zero_which_disables_the_row_cap(): void
+    {
+        // NotFoundLogger's own enforceRowLimit() treats <= 0 as uncapped —
+        // the validator must not reject that shape before it gets there.
+        $this->repo()->set('not_found.max_rows', 0);
+
+        $this->assertSame(0, config('seo.not_found.max_rows'));
+    }
+
+    public function test_a_regex_list_setting_rejects_a_catastrophic_pattern(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('not_found.exclude', ['#(a+)+$#']);
+    }
+
+    public function test_a_regex_list_setting_rejects_an_invalid_pattern(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('not_found.exclude', ['#unclosed[']);
+    }
+
+    public function test_a_regex_list_setting_accepts_a_valid_list(): void
+    {
+        $this->repo()->set('not_found.exclude', ['#\.(js|css)$#i']);
+
+        $this->assertSame(['#\.(js|css)$#i'], config('seo.not_found.exclude'));
+    }
+
+    public function test_a_host_list_setting_rejects_a_full_url(): void
+    {
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('redirects.allowed_hosts', ['https://cdn.example.com']);
+    }
+
+    public function test_a_host_list_setting_accepts_a_bare_hostname(): void
+    {
+        $this->repo()->set('redirects.allowed_hosts', ['cdn.example.com']);
+
+        $this->assertSame(['cdn.example.com'], config('seo.redirects.allowed_hosts'));
+    }
+
+    public function test_redirects_boolean_settings_round_trip(): void
+    {
+        $this->repo()->set('redirects.enabled', false);
+        $this->repo()->set('redirects.eager', true);
+        $this->repo()->set('redirects.keep_query', false);
+
+        $this->assertFalse(config('seo.redirects.enabled'));
+        $this->assertTrue(config('seo.redirects.eager'));
+        $this->assertFalse(config('seo.redirects.keep_query'));
+    }
+
     private function repo(): SettingsRepository
     {
         return $this->app->make(SettingsRepository::class);

@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use Duxbo\Seo\Http\Api\V1\NotFoundIngestController;
 use Duxbo\Seo\Http\Controllers\IndexNowKeyController;
 use Duxbo\Seo\Http\Controllers\RobotsController;
 use Duxbo\Seo\Http\Controllers\SitemapController;
+use Duxbo\Seo\Http\Middleware\VerifyNotFoundIngestToken;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -44,4 +46,20 @@ if (config('seo.indexnow.enabled', false) === true && is_string($indexNowKey) &&
     // one file it named in the submission, and a wildcard here would swallow
     // any other *.txt route the host application registers.
     Route::get($indexNowKey.'.txt', IndexNowKeyController::class)->name('seo.indexnow.key');
+}
+
+$notFoundIngestToken = config('seo.not_found.ingest_token');
+
+// Independent of seo.api.enabled on purpose: a project may want 404
+// ingestion from a decoupled front end (a Next.js app with its own
+// router, never proxied through this application) without opening the
+// rest of the admin JSON API. Same prefix that API already uses, but
+// behind its own bare-token middleware instead of the viewSeoPanel Gate —
+// the caller here is a server with no Laravel session to gate on.
+if (is_string($notFoundIngestToken) && $notFoundIngestToken !== '') {
+    Route::prefix(config('seo.api.prefix', 'api/seo/v1'))->group(static function (): void {
+        Route::post('not-found', [NotFoundIngestController::class, 'store'])
+            ->middleware(['throttle:120,1', VerifyNotFoundIngestToken::class])
+            ->name('seo.not-found.ingest');
+    });
 }

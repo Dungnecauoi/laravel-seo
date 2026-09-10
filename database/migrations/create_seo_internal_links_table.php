@@ -24,12 +24,21 @@ return new class extends Migration
             $table->char('target_hash', 32);
             $table->text('anchor_text')->nullable();
 
+            // Null means the crawl was not run for any particular locale —
+            // a single-language site, or content that isn't translated at
+            // all. A record scanned once per locale (its own content
+            // attribute reading differently per app()->getLocale()) gets
+            // one set of rows per locale, so re-crawling one language never
+            // deletes another's — see seo:internal-links's own --locale option.
+            $table->string('locale', 10)->nullable();
+
             $table->timestamp('created_at')->nullable();
 
-            // Every crawl of one source deletes its old rows and inserts the
-            // current set, rather than trying to diff and update in place —
-            // simpler, and correct even when a link's anchor text changed.
-            $table->index(['source_type', 'source_id'], 'seo_internal_links_source_index');
+            // Every crawl of one source (for one locale) deletes its old
+            // rows for that same source+locale and inserts the current set,
+            // rather than trying to diff and update in place — simpler, and
+            // correct even when a link's anchor text changed.
+            $table->index(['source_type', 'source_id', 'locale'], 'seo_internal_links_source_index');
             $table->index('target_hash', 'seo_internal_links_target_index');
         });
     }

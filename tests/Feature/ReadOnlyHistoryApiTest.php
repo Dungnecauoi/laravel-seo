@@ -52,8 +52,11 @@ final class ReadOnlyHistoryApiTest extends TestCase
 
         $this->getJson('/api/seo/v1/audit-history')->assertForbidden();
         $this->getJson('/api/seo/v1/internal-links')->assertForbidden();
+        $this->getJson('/api/seo/v1/internal-links/detail')->assertForbidden();
         $this->getJson('/api/seo/v1/broken-links')->assertForbidden();
         $this->getJson('/api/seo/v1/search-console/stats')->assertForbidden();
+        $this->getJson('/api/seo/v1/search-console/stats/timeseries?url=x')->assertForbidden();
+        $this->getJson('/api/seo/v1/search-console/stats/daily')->assertForbidden();
         $this->getJson('/api/seo/v1/search-console/inspections')->assertForbidden();
         $this->getJson('/api/seo/v1/indexnow/log')->assertForbidden();
         $this->getJson('/api/seo/v1/google-indexing/log')->assertForbidden();
@@ -136,6 +139,56 @@ final class ReadOnlyHistoryApiTest extends TestCase
         $this->assertSame('Xem thêm', $data[0]['sources'][0]['anchorText']);
     }
 
+    public function test_internal_links_detail_lists_individual_rows_with_the_source_url_resolved(): void
+    {
+        $source = Post::query()->create(['name' => 'A', 'slug' => 'bai-a']);
+
+        DB::table('seo_internal_links')->insert([
+            'source_type' => 'post',
+            'source_id' => (string) $source->getKey(),
+            'target_url' => 'https://trangcuatoi.vn/bai-viet/bai-b',
+            'target_hash' => md5('/bai-viet/bai-b'),
+            'anchor_text' => 'Xem thêm',
+            'locale' => null,
+            'created_at' => now(),
+        ]);
+
+        $data = $this->getJson('/api/seo/v1/internal-links/detail')->assertOk()->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame('post', $data[0]['sourceType']);
+        $this->assertSame((string) $source->getKey(), $data[0]['sourceId']);
+        $this->assertSame($source->seoUrl(), $data[0]['sourceUrl']);
+        $this->assertSame('https://trangcuatoi.vn/bai-viet/bai-b', $data[0]['targetUrl']);
+        $this->assertSame('Xem thêm', $data[0]['anchorText']);
+    }
+
+    public function test_internal_links_detail_filters_by_type(): void
+    {
+        DB::table('seo_internal_links')->insert([
+            ['source_type' => 'post', 'source_id' => '1', 'target_url' => 'https://x/a', 'target_hash' => md5('/a'), 'created_at' => now()],
+            ['source_type' => 'category', 'source_id' => '1', 'target_url' => 'https://x/b', 'target_hash' => md5('/b'), 'created_at' => now()],
+        ]);
+
+        $data = $this->getJson('/api/seo/v1/internal-links/detail?type=post')->assertOk()->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame('post', $data[0]['sourceType']);
+    }
+
+    public function test_internal_links_detail_filters_by_locale(): void
+    {
+        DB::table('seo_internal_links')->insert([
+            ['source_type' => 'post', 'source_id' => '1', 'target_url' => 'https://x/vi', 'target_hash' => md5('/vi'), 'locale' => 'vi', 'created_at' => now()],
+            ['source_type' => 'post', 'source_id' => '1', 'target_url' => 'https://x/en', 'target_hash' => md5('/en'), 'locale' => 'en', 'created_at' => now()],
+        ]);
+
+        $data = $this->getJson('/api/seo/v1/internal-links/detail?locale=vi')->assertOk()->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame('https://x/vi', $data[0]['targetUrl']);
+    }
+
     public function test_search_console_stats_sums_clicks_per_url_and_excludes_old_rows(): void
     {
         DB::table('seo_search_console_stats')->insert([
@@ -150,6 +203,48 @@ final class ReadOnlyHistoryApiTest extends TestCase
         $this->assertSame('https://trangcuatoi.vn/a', $body['data'][0]['url']);
         $this->assertSame(12, $body['data'][0]['clicks']);
         $this->assertCount(1, $body['data']);
+    }
+
+    public function test_search_console_timeseries_returns_ascending_daily_rows_for_one_url(): void
+    {
+        DB::table('seo_search_console_stats')->insert([
+            ['url' => 'https://x/a', 'url_hash' => md5('https://x/a'), 'date' => now()->subDays(2)->toDateString(), 'clicks' => 3, 'impressions' => 30, 'ctr' => 0.1, 'position' => 4.0, 'created_at' => now(), 'updated_at' => now()],
+            ['url' => 'https://x/a', 'url_hash' => md5('https://x/a'), 'date' => now()->subDays(1)->toDateString(), 'clicks' => 5, 'impressions' => 50, 'ctr' => 0.1, 'position' => 3.0, 'created_at' => now(), 'updated_at' => now()],
+            // A different URL — must never appear in a request for /a.
+            ['url' => 'https://x/b', 'url_hash' => md5('https://x/b'), 'date' => now()->toDateString(), 'clicks' => 999, 'impressions' => 999, 'ctr' => 1, 'position' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $data = $this->getJson('/api/seo/v1/search-console/stats/timeseries?url='.urlencode('https://x/a').'&days=30')
+            ->assertOk()->json('data');
+
+        $this->assertCount(2, $data);
+        $this->assertSame(3, $data[0]['clicks']);
+        $this->assertSame(5, $data[1]['clicks']);
+    }
+
+    public function test_search_console_timeseries_requires_a_url_parameter(): void
+    {
+        $this->getJson('/api/seo/v1/search-console/stats/timeseries')->assertStatus(422);
+    }
+
+    public function test_search_console_daily_sums_across_urls_per_date(): void
+    {
+        $today = now()->toDateString();
+        $yesterday = now()->subDay()->toDateString();
+
+        DB::table('seo_search_console_stats')->insert([
+            ['url' => 'https://x/a', 'url_hash' => md5('a'), 'date' => $today, 'clicks' => 3, 'impressions' => 30, 'ctr' => 0.1, 'position' => 4.0, 'created_at' => now(), 'updated_at' => now()],
+            ['url' => 'https://x/b', 'url_hash' => md5('b'), 'date' => $today, 'clicks' => 5, 'impressions' => 50, 'ctr' => 0.1, 'position' => 2.0, 'created_at' => now(), 'updated_at' => now()],
+            ['url' => 'https://x/a', 'url_hash' => md5('a2'), 'date' => $yesterday, 'clicks' => 1, 'impressions' => 10, 'ctr' => 0.1, 'position' => 5.0, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $body = $this->getJson('/api/seo/v1/search-console/stats/daily?days=30')->assertOk()->json();
+
+        $rows = collect($body['data'])->keyBy('date');
+
+        $this->assertSame(8, $rows[$today]['clicks']);
+        $this->assertSame(1, $rows[$yesterday]['clicks']);
+        $this->assertSame(9, $body['totalClicks']);
     }
 
     public function test_indexnow_log_lists_recent_submissions_newest_first(): void

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\NotFound;
 
+use Duxbo\Seo\Data\NotFoundHit;
 use Duxbo\Seo\Events\NotFoundLogged;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -26,13 +26,13 @@ final class NotFoundLogger
     ) {
     }
 
-    public function log(Request $request): void
+    public function log(NotFoundHit $hit): void
     {
         if (! $this->enabled()) {
             return;
         }
 
-        $path = '/'.ltrim($request->getPathInfo(), '/');
+        $path = '/'.ltrim($hit->path, '/');
 
         if ($this->isExcluded($path) || ! $this->sampled()) {
             return;
@@ -49,8 +49,8 @@ final class NotFoundLogger
             ->update([
                 'hits' => DB::raw('hits + 1'),
                 'last_seen_at' => $now,
-                'referrer' => $this->truncate($request->headers->get('referer')),
-                'user_agent' => $this->truncate($request->userAgent()),
+                'referrer' => $this->truncate($hit->referrer),
+                'user_agent' => $this->truncate($hit->userAgent),
             ]);
 
         if ($affected === 0) {
@@ -58,8 +58,8 @@ final class NotFoundLogger
                 'path' => $path,
                 'path_hash' => $hash,
                 'hits' => 1,
-                'referrer' => $this->truncate($request->headers->get('referer')),
-                'user_agent' => $this->truncate($request->userAgent()),
+                'referrer' => $this->truncate($hit->referrer),
+                'user_agent' => $this->truncate($hit->userAgent),
                 'first_seen_at' => $now,
                 'last_seen_at' => $now,
             ]);
@@ -67,7 +67,7 @@ final class NotFoundLogger
             $this->enforceRowLimit();
         }
 
-        $this->events->dispatch(new NotFoundLogged($path, $request));
+        $this->events->dispatch(new NotFoundLogged($path, $hit));
     }
 
     /**

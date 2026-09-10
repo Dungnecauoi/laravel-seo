@@ -27,7 +27,8 @@ final class InternalLinksCommand extends Command
 {
     protected $signature = 'seo:internal-links
         {model : Fully-qualified class name of the model to scan}
-        {--content=body : The model attribute holding page content to search for links}';
+        {--content=body : The model attribute holding page content to search for links}
+        {--locale= : Crawl as this locale (sets app locale before reading content) and store rows tagged with it, so re-crawling one language never deletes another\'s}';
 
     protected $description = "Crawl a model's content for internal links and report pages nothing links to";
 
@@ -53,64 +54,92 @@ final class InternalLinksCommand extends Command
         $contentAttribute = (string) $this->option('content');
         $table = (string) config('seo.internal_links.table', 'seo_internal_links');
 
-        /** @var array<string, string> $ownUrls */
-        $ownUrls = [];
-        $linkCount = 0;
-        $recordCount = 0;
+        /** @var ?string $locale */
+        $locale = $this->option('locale');
+        $locale = is_string($locale) && $locale !== '' ? $locale : null;
 
-        /** @var \Illuminate\Database\Eloquent\Builder<Model> $query */
-        $query = $modelClass::query();
+        // A model whose seoUrl()/content attribute reads differently per
+        // app()->getLocale() (a translatable model) needs the app actually
+        // switched to that locale while crawling — restored afterward so a
+        // caller running this mid-request (RunInternalLinksCommandTool,
+        // via Artisan::call() in the same process) never leaks a locale
+        // change into whatever runs after it.
+        $originalLocale = $this->laravel->getLocale();
 
-        foreach ($query->lazyById() as $record) {
-            /** @var Model&Seoable $record */
-            $recordCount++;
-            $sourceType = $record->seoType();
-            $sourceId = (string) $record->seoKey();
-
-            $ownUrls[$sourceType.':'.$sourceId] = [
-                'url' => $record->seoUrl(),
-                'path' => self::path($record->seoUrl()),
-            ];
-
-            $content = (string) ($record->{$contentAttribute} ?? '');
-            $links = $extractor->extract($content)->internalLinks();
-
-            DB::table($table)
-                ->where('source_type', $sourceType)
-                ->where('source_id', $sourceId)
-                ->delete();
-
-            if ($links === []) {
-                continue;
-            }
-
-            $rows = [];
-
-            foreach ($links as $link) {
-                $target = $urls->absolute($link->href);
-
-                $rows[] = [
-                    'source_type' => $sourceType,
-                    'source_id' => $sourceId,
-                    'target_url' => $target,
-                    // Hashed on the path alone, not the full absolute URL: an
-                    // href made absolute against app.url and a model's own
-                    // seoUrl() can legitimately disagree on scheme or host
-                    // (a CDN domain, a proxy, app.url simply not matching a
-                    // model's own override) while still being the same page.
-                    'target_hash' => md5(self::path($target)),
-                    'anchor_text' => $link->text !== '' ? $link->text : null,
-                    'created_at' => Carbon::now(),
-                ];
-            }
-
-            DB::table($table)->insert($rows);
-            $linkCount += count($rows);
+        if ($locale !== null) {
+            $this->laravel->setLocale($locale);
         }
 
-        $this->info("Crawled {$recordCount} record(s), found {$linkCount} internal link(s).");
+        try {
+            /** @var array<string, string> $ownUrls */
+            $ownUrls = [];
+            $linkCount = 0;
+            $recordCount = 0;
 
-        $this->reportOrphans($table, $ownUrls);
+            /** @var \Illuminate\Database\Eloquent\Builder<Model> $query */
+            $query = $modelClass::query();
+
+            foreach ($query->lazyById() as $record) {
+                /** @var Model&Seoable $record */
+                $recordCount++;
+                $sourceType = $record->seoType();
+                $sourceId = (string) $record->seoKey();
+
+                $ownUrls[$sourceType.':'.$sourceId] = [
+                    'url' => $record->seoUrl(),
+                    'path' => self::path($record->seoUrl()),
+                ];
+
+                $content = (string) ($record->{$contentAttribute} ?? '');
+                $links = $extractor->extract($content)->internalLinks();
+
+                DB::table($table)
+                    ->where('source_type', $sourceType)
+                    ->where('source_id', $sourceId)
+                    ->when(
+                        $locale === null,
+                        static fn ($q) => $q->whereNull('locale'),
+                        static fn ($q) => $q->where('locale', $locale),
+                    )
+                    ->delete();
+
+                if ($links === []) {
+                    continue;
+                }
+
+                $rows = [];
+
+                foreach ($links as $link) {
+                    $target = $urls->absolute($link->href);
+
+                    $rows[] = [
+                        'source_type' => $sourceType,
+                        'source_id' => $sourceId,
+                        'target_url' => $target,
+                        // Hashed on the path alone, not the full absolute URL: an
+                        // href made absolute against app.url and a model's own
+                        // seoUrl() can legitimately disagree on scheme or host
+                        // (a CDN domain, a proxy, app.url simply not matching a
+                        // model's own override) while still being the same page.
+                        'target_hash' => md5(self::path($target)),
+                        'anchor_text' => $link->text !== '' ? $link->text : null,
+                        'locale' => $locale,
+                        'created_at' => Carbon::now(),
+                    ];
+                }
+
+                DB::table($table)->insert($rows);
+                $linkCount += count($rows);
+            }
+
+            $this->info("Crawled {$recordCount} record(s), found {$linkCount} internal link(s).");
+
+            $this->reportOrphans($table, $ownUrls, $locale);
+        } finally {
+            if ($locale !== null) {
+                $this->laravel->setLocale($originalLocale);
+            }
+        }
 
         return self::SUCCESS;
     }
@@ -118,7 +147,7 @@ final class InternalLinksCommand extends Command
     /**
      * @param  array<string, array{url: string, path: string}>  $ownUrls  "{type}:{id}" => its own URL and path
      */
-    private function reportOrphans(string $table, array $ownUrls): void
+    private function reportOrphans(string $table, array $ownUrls, ?string $locale): void
     {
         if ($ownUrls === []) {
             return;
@@ -127,7 +156,16 @@ final class InternalLinksCommand extends Command
         /** @var array<string, true> $linkedPaths */
         $linkedPaths = [];
 
-        foreach (DB::table($table)->distinct()->pluck('target_hash') as $hash) {
+        $hashes = DB::table($table)
+            ->when(
+                $locale === null,
+                static fn ($q) => $q->whereNull('locale'),
+                static fn ($q) => $q->where('locale', $locale),
+            )
+            ->distinct()
+            ->pluck('target_hash');
+
+        foreach ($hashes as $hash) {
             $linkedPaths[$hash] = true;
         }
 

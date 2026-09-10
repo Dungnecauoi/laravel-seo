@@ -86,8 +86,11 @@ Route::prefix(config('seo.api.prefix', 'api/seo/v1'))
         // page load waits on), these just expose what it already wrote.
         Route::get('audit-history', [AuditHistoryController::class, 'index']);
         Route::get('internal-links', [InternalLinksController::class, 'index']);
+        Route::get('internal-links/detail', [InternalLinksController::class, 'detail']);
         Route::get('broken-links', [BrokenLinksController::class, 'index']);
         Route::get('search-console/stats', [SearchConsoleStatsController::class, 'index']);
+        Route::get('search-console/stats/timeseries', [SearchConsoleStatsController::class, 'timeseries']);
+        Route::get('search-console/stats/daily', [SearchConsoleStatsController::class, 'daily']);
         Route::get('search-console/inspections', [UrlInspectionsController::class, 'index']);
         Route::get('pagespeed/stats', [PageSpeedStatsController::class, 'index']);
         Route::get('indexnow/log', [IndexNowLogController::class, 'index']);

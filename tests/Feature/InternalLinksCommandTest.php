@@ -96,6 +96,57 @@ final class InternalLinksCommandTest extends TestCase
         $this->assertSame(0, DB::table('seo_internal_links')->count());
     }
 
+    public function test_crawling_one_locale_does_not_delete_another_locales_rows(): void
+    {
+        $post = $this->makePost(['excerpt' => '<a href="/bai-viet/vi-target">vi</a>']);
+
+        $this->artisan('seo:internal-links', [
+            'model' => Post::class, '--content' => 'excerpt', '--locale' => 'vi',
+        ])->assertSuccessful();
+
+        $post->update(['excerpt' => '<a href="/bai-viet/en-target">en</a>']);
+
+        $this->artisan('seo:internal-links', [
+            'model' => Post::class, '--content' => 'excerpt', '--locale' => 'en',
+        ])->assertSuccessful();
+
+        // Before the fix, the second (en) crawl's delete-by-source-id alone
+        // would have wiped the first (vi) crawl's rows too.
+        $this->assertSame(1, DB::table('seo_internal_links')->where('locale', 'vi')->count());
+        $this->assertSame(1, DB::table('seo_internal_links')->where('locale', 'en')->count());
+        $this->assertDatabaseHas('seo_internal_links', ['locale' => 'vi', 'target_url' => 'http://localhost/bai-viet/vi-target']);
+        $this->assertDatabaseHas('seo_internal_links', ['locale' => 'en', 'target_url' => 'http://localhost/bai-viet/en-target']);
+    }
+
+    public function test_recrawling_the_same_locale_still_replaces_only_its_own_rows(): void
+    {
+        $post = $this->makePost(['excerpt' => '<a href="/bai-viet/vi-old">old</a>']);
+
+        $this->artisan('seo:internal-links', [
+            'model' => Post::class, '--content' => 'excerpt', '--locale' => 'vi',
+        ])->assertSuccessful();
+
+        $post->update(['excerpt' => '<a href="/bai-viet/vi-new">new</a>']);
+
+        $this->artisan('seo:internal-links', [
+            'model' => Post::class, '--content' => 'excerpt', '--locale' => 'vi',
+        ])->assertSuccessful();
+
+        $this->assertSame(1, DB::table('seo_internal_links')->where('locale', 'vi')->count());
+        $this->assertDatabaseHas('seo_internal_links', ['locale' => 'vi', 'target_url' => 'http://localhost/bai-viet/vi-new']);
+        $this->assertDatabaseMissing('seo_internal_links', ['target_url' => 'http://localhost/bai-viet/vi-old']);
+    }
+
+    public function test_no_locale_option_stores_a_null_locale_as_before(): void
+    {
+        $this->makePost(['excerpt' => '<a href="/bai-viet/x">x</a>']);
+
+        $this->artisan('seo:internal-links', ['model' => Post::class, '--content' => 'excerpt'])
+            ->assertSuccessful();
+
+        $this->assertNull(DB::table('seo_internal_links')->value('locale'));
+    }
+
     public function test_external_links_are_not_stored(): void
     {
         $this->makePost(['excerpt' => '<a href="https://google.com">Google</a>']);

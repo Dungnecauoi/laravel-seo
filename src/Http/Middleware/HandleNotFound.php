@@ -6,6 +6,7 @@ namespace Duxbo\Seo\Http\Middleware;
 
 use Closure;
 use Duxbo\Seo\Contracts\RedirectMatcher;
+use Duxbo\Seo\Data\NotFoundHit;
 use Duxbo\Seo\NotFound\NotFoundLogger;
 use Duxbo\Seo\Redirects\Redirect;
 use Illuminate\Contracts\Config\Repository as Config;
@@ -57,7 +58,11 @@ final class HandleNotFound
             }
         }
 
-        $this->logger->log($request);
+        $this->logger->log(new NotFoundHit(
+            path: $request->getPathInfo(),
+            referrer: $request->headers->get('referer'),
+            userAgent: $request->userAgent(),
+        ));
 
         return $response;
     }

@@ -31,6 +31,7 @@ final class RunInternalLinksCommandTool extends ConsoleCommandTool implements Ai
             'properties' => [
                 'model' => ['type' => 'string', 'description' => 'Fully-qualified model class, e.g. App\\Models\\Post.'],
                 'content' => ['type' => 'string', 'description' => 'Attribute holding page content. Defaults to "body".'],
+                'locale' => ['type' => 'string', 'description' => 'Crawl as this locale and store rows tagged with it, so re-crawling one language never deletes another\'s.'],
             ],
             'required' => ['model'],
         ];
@@ -57,6 +58,10 @@ final class RunInternalLinksCommandTool extends ConsoleCommandTool implements Ai
 
         if (isset($input['content'])) {
             $arguments['--content'] = (string) $input['content'];
+        }
+
+        if (isset($input['locale'])) {
+            $arguments['--locale'] = (string) $input['locale'];
         }
 
         return $arguments;

@@ -6,6 +6,7 @@ namespace Duxbo\Seo\Redirects;
 
 use Duxbo\Seo\Enums\RedirectMatchType;
 use Duxbo\Seo\Exceptions\UnsafeRedirect;
+use Duxbo\Seo\Support\CatastrophicPattern;
 use Duxbo\Seo\Support\SameOriginUrls;
 
 /**
@@ -62,7 +63,7 @@ final class RedirectGuard
 
         // Nested quantifiers are the shape that makes a pattern take
         // exponential time on a crafted path, hanging the request.
-        if (preg_match('/(\([^)]*[+*][^)]*\)|\[[^\]]*\])\s*[+*]{1,2}/', $source) === 1) {
+        if (CatastrophicPattern::detected($source)) {
             throw UnsafeRedirect::catastrophicPattern($source);
         }
 

@@ -43,7 +43,11 @@ use Duxbo\Seo\Resolution\Stages\TemplateStage;
 use Duxbo\Seo\Resolution\Stages\TokenExpansionStage;
 use Duxbo\Seo\Resolution\Stages\TruncateStage;
 use Duxbo\Seo\Settings\Validators\BooleanSettingValidator;
+use Duxbo\Seo\Settings\Validators\HostListSettingValidator;
 use Duxbo\Seo\Settings\Validators\IndexNowKeyValidator;
+use Duxbo\Seo\Settings\Validators\IntegerSettingValidator;
+use Duxbo\Seo\Settings\Validators\RegexListSettingValidator;
+use Duxbo\Seo\Settings\Validators\SampleRateSettingValidator;
 use Duxbo\Seo\Settings\Validators\SearchConsoleCredentialValidator;
 use Duxbo\Seo\Settings\Validators\StringSettingValidator;
 use Duxbo\Seo\Settings\Validators\TwitterCardSettingValidator;
@@ -667,6 +671,15 @@ return [
             'search_console.client_secret',
             'search_console.refresh_token',
             'search_console.site_url',
+            'not_found.enabled',
+            'not_found.sample_rate',
+            'not_found.max_rows',
+            'not_found.exclude',
+            'not_found.ingest_token',
+            'redirects.enabled',
+            'redirects.eager',
+            'redirects.keep_query',
+            'redirects.allowed_hosts',
         ],
 
         // Still writable through the same PUT — this only changes what GET
@@ -674,10 +687,13 @@ return [
         // access to Google on this site's behalf; unlike indexnow.key
         // (published at /{key}.txt on purpose) or client_id (routinely
         // visible in a browser's own OAuth redirect), neither has any
-        // legitimate reason to be readable again once it is set.
+        // legitimate reason to be readable again once it is set. The same
+        // reasoning covers not_found.ingest_token: a bearer token
+        // authorizing writes to a public endpoint.
         'secret_keys' => [
             'search_console.client_secret',
             'search_console.refresh_token',
+            'not_found.ingest_token',
         ],
 
         // One validator per key above, checking shape rather than just
@@ -712,6 +728,15 @@ return [
             'search_console.client_secret' => SearchConsoleCredentialValidator::class,
             'search_console.refresh_token' => SearchConsoleCredentialValidator::class,
             'search_console.site_url' => UrlSettingValidator::class,
+            'not_found.enabled' => BooleanSettingValidator::class,
+            'not_found.sample_rate' => SampleRateSettingValidator::class,
+            'not_found.max_rows' => IntegerSettingValidator::class,
+            'not_found.exclude' => RegexListSettingValidator::class,
+            'not_found.ingest_token' => StringSettingValidator::class,
+            'redirects.enabled' => BooleanSettingValidator::class,
+            'redirects.eager' => BooleanSettingValidator::class,
+            'redirects.keep_query' => BooleanSettingValidator::class,
+            'redirects.allowed_hosts' => HostListSettingValidator::class,
         ],
     ],
 
@@ -765,6 +790,26 @@ return [
             '#^/(wp-admin|wp-login|wp-content|xmlrpc)#i',
             '#^/(\.env|\.git|vendor|storage/framework)#i',
         ],
+
+        /*
+        |----------------------------------------------------------------------
+        | Ingest token
+        |----------------------------------------------------------------------
+        |
+        | Set this when the real front end is a separately-deployed
+        | application (a Next.js SPA, a mobile app's own backend) that
+        | never routes a request through this Laravel install at all —
+        | HandleNotFound only ever fires for a 404 that reaches this
+        | application's own router, so a decoupled front end's real 404s
+        | would otherwise never reach seo_not_found. Once set, POST
+        | {api.prefix}/not-found accepts a hit from that front end's own
+        | backend, authenticated by this bare token (header
+        | X-Seo-Ingest-Token, compared with hash_equals()) rather than a
+        | Laravel session that server has no way to hold. Left null, the
+        | route is never registered at all — see routes/seo.php.
+        |
+        */
+        'ingest_token' => env('SEO_NOT_FOUND_INGEST_TOKEN'),
     ],
 
     /*

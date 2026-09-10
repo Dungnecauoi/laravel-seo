@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Tests\Feature;
 
+use Duxbo\Seo\Data\NotFoundHit;
 use Duxbo\Seo\NotFound\NotFoundLogger;
 use Duxbo\Seo\Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -99,6 +100,24 @@ final class NotFoundTest extends TestCase
         $this->get('/khong-co');
 
         $this->assertSame(0, DB::table('seo_not_found')->count());
+    }
+
+    public function test_a_hit_can_be_logged_directly_from_a_notfoundhit_without_a_real_request(): void
+    {
+        // A hit reported through the ingest endpoint never had a real
+        // Illuminate\Http\Request to begin with — this is the shape
+        // NotFoundIngestController actually calls.
+        app(NotFoundLogger::class)->log(new NotFoundHit(
+            path: '/tu-ben-ngoai',
+            referrer: 'https://google.com',
+            userAgent: 'Mozilla/5.0',
+        ));
+
+        $this->assertDatabaseHas('seo_not_found', [
+            'path' => '/tu-ben-ngoai',
+            'referrer' => 'https://google.com',
+            'user_agent' => 'Mozilla/5.0',
+        ]);
     }
 
     public function test_a_long_user_agent_is_truncated_rather_than_overflowing(): void
