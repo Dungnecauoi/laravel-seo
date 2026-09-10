@@ -6,6 +6,34 @@ only changes in a major release. The rest of `src/` is free to be refactored.
 
 ## Unreleased
 
+## 0.12.1 — 2026-09-10
+
+### Fixed
+
+- **Every `seo:*` console command was unreachable via `Artisan::call()` from
+  a web request** — meaning every `seo.console.*` AI tool
+  (`ConsoleCommandTool::execute()`, called from the REST API, the panel,
+  or MCP over HTTP) always failed with `CommandNotFoundException`,
+  regardless of how the package was deployed. `SeoServiceProvider::boot()`
+  called `$this->commands([...])` only inside `if ($this->app->runningInConsole())`.
+  `ServiceProvider::commands()` doesn't register anything itself — it
+  queues a deferred `Artisan::starting()` bootstrapper, run the first time
+  `Artisan::call()` constructs its underlying console application. Gating
+  the call to `commands()` behind `runningInConsole()` meant that
+  bootstrapper was never queued during an ordinary web request (where
+  `runningInConsole()` is false from the start), so the first
+  `Artisan::call()` in that same request found no command registered at
+  all — a straight `php artisan seo:...` from a terminal worked fine
+  (that process really is running in console), masking the bug for anyone
+  who only tested that way. `$this->commands([...])` now runs
+  unconditionally in `boot()`; `publishes()`/`publishMigrations()` stay
+  console-gated, since those only make sense under `vendor:publish`.
+  PHPUnit itself runs under the CLI SAPI, so `runningInConsole()` was true
+  throughout the entire existing test suite — the new
+  `ConsoleCommandsAvailableOutsideConsoleTest` forces it false via
+  `APP_RUNNING_IN_CONSOLE` to actually exercise the web-request case this
+  bug lived in.
+
 ## 0.12.0 — 2026-09-10
 
 ### Added — a decoupled SPA front end can report its own 404s, browse the real internal-link graph, and read Search Console as a time series

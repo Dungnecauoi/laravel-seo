@@ -168,6 +168,33 @@ final class SeoServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'seo');
         $this->registerPanelViewComposer();
 
+        // ServiceProvider::commands() only ever queues a deferred
+        // Artisan::starting() bootstrapper — it does no work itself and
+        // costs nothing outside a real `php artisan` process. It must run
+        // unconditionally: a ConsoleCommandTool (every seo.console.* AI
+        // tool) calls Artisan::call() from inside whatever *web* request
+        // invoked it, where runningInConsole() is false. Gating this call
+        // behind that check meant the deferred bootstrapper was never
+        // queued for that request, so the first Artisan::call() in it
+        // found no command registered at all — a CommandNotFoundException
+        // no amount of redeploying would fix, since the bug was in when
+        // this ran, not what was deployed.
+        $this->commands([
+            SitemapCommand::class,
+            PruneNotFoundCommand::class,
+            DuplicatesCommand::class,
+            HreflangAuditCommand::class,
+            IndexNowCommand::class,
+            GoogleIndexingCommand::class,
+            AuditCommand::class,
+            InternalLinksCommand::class,
+            BrokenLinksCommand::class,
+            SearchConsoleSyncCommand::class,
+            SearchConsoleInspectCommand::class,
+            PageSpeedCommand::class,
+            AiToolsCommand::class,
+        ]);
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 $this->configPath() => config_path('seo.php'),
@@ -182,22 +209,6 @@ final class SeoServiceProvider extends ServiceProvider
             ], 'seo-views');
 
             $this->publishMigrations();
-
-            $this->commands([
-                SitemapCommand::class,
-                PruneNotFoundCommand::class,
-                DuplicatesCommand::class,
-                HreflangAuditCommand::class,
-                IndexNowCommand::class,
-                GoogleIndexingCommand::class,
-                AuditCommand::class,
-                InternalLinksCommand::class,
-                BrokenLinksCommand::class,
-                SearchConsoleSyncCommand::class,
-                SearchConsoleInspectCommand::class,
-                PageSpeedCommand::class,
-                AiToolsCommand::class,
-            ]);
         }
     }
 
