@@ -4,14 +4,28 @@ declare(strict_types=1);
 
 namespace Duxbo\Seo\Tests\Feature;
 
+use Duxbo\Seo\Console\InternalLinksCommand;
 use Duxbo\Seo\Tests\Fixtures\Post;
 use Duxbo\Seo\Tests\TestCase;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use ReflectionProperty;
 
 final class InternalLinksCommandTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function tearDown(): void
+    {
+        // Guards every other test in the suite: this is a static (process-
+        // wide, not per-instance) lock, so leaving it true after a test
+        // that exercises it would make every subsequent --locale crawl in
+        // this same PHPUnit process fail for a reason that has nothing to
+        // do with that test.
+        self::localeLock()->setValue(null, false);
+
+        parent::tearDown();
+    }
 
     public function test_rejects_an_unknown_model_class(): void
     {
@@ -137,6 +151,25 @@ final class InternalLinksCommandTest extends TestCase
         $this->assertDatabaseMissing('seo_internal_links', ['target_url' => 'http://localhost/bai-viet/vi-old']);
     }
 
+    public function test_a_locale_crawl_refuses_to_run_while_another_one_is_already_in_progress(): void
+    {
+        $this->makePost(['excerpt' => '<a href="/bai-viet/x">x</a>']);
+
+        // Simulates the state a genuinely concurrent --locale crawl on the
+        // same Octane worker would leave behind mid-run, without needing
+        // real concurrency to prove the lock refuses a second one outright
+        // rather than letting two crawls race to restore the app locale.
+        self::localeLock()->setValue(null, true);
+
+        $this->artisan('seo:internal-links', [
+            'model' => Post::class, '--content' => 'excerpt', '--locale' => 'vi',
+        ])
+            ->expectsOutputToContain('already running on this worker')
+            ->assertFailed();
+
+        $this->assertSame(0, DB::table('seo_internal_links')->count());
+    }
+
     public function test_no_locale_option_stores_a_null_locale_as_before(): void
     {
         $this->makePost(['excerpt' => '<a href="/bai-viet/x">x</a>']);
@@ -156,6 +189,14 @@ final class InternalLinksCommandTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame(0, DB::table('seo_internal_links')->count());
+    }
+
+    private static function localeLock(): ReflectionProperty
+    {
+        $property = new ReflectionProperty(InternalLinksCommand::class, 'localeMutationInProgress');
+        $property->setAccessible(true);
+
+        return $property;
     }
 
     /**

@@ -21,6 +21,18 @@ use Duxbo\Seo\SearchConsole\SearchConsoleClient;
  */
 final class InspectUrlsTool implements AiTool, AiToolPreviewable
 {
+    /**
+     * URL Inspection has no batch endpoint and Google rate-limits it far
+     * tighter than search analytics (roughly 2,000 requests/day/site, per
+     * this class's own docblock) — a single AI-authored URL list large
+     * enough could exhaust a meaningful fraction of a whole day's quota in
+     * one tool call. This package has no way to know an account's actual
+     * remaining quota, so it cannot enforce the real daily limit, but
+     * capping one call's own batch size keeps any single call's damage
+     * bounded.
+     */
+    private const MAX_URLS = 50;
+
     public function __construct(private readonly SearchConsoleClient $client)
     {
     }
@@ -41,7 +53,7 @@ final class InspectUrlsTool implements AiTool, AiToolPreviewable
         return [
             'type' => 'object',
             'properties' => [
-                'urls' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1],
+                'urls' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1, 'maxItems' => self::MAX_URLS],
             ],
             'required' => ['urls'],
         ];
@@ -65,9 +77,19 @@ final class InspectUrlsTool implements AiTool, AiToolPreviewable
 
     public function execute(array $input, AiToolContext $context): ?array
     {
+        $urls = $this->urls($input);
+
+        if (count($urls) > self::MAX_URLS) {
+            throw new \InvalidArgumentException(sprintf(
+                'seo.search_console.inspect accepts at most %d URLs per call (got %d) — split this into smaller batches.',
+                self::MAX_URLS,
+                count($urls),
+            ));
+        }
+
         $results = [];
 
-        foreach ($this->urls($input) as $url) {
+        foreach ($urls as $url) {
             try {
                 $results[] = ['url' => $url, ...$this->client->inspect($url)];
             } catch (SearchConsoleSyncFailed $e) {

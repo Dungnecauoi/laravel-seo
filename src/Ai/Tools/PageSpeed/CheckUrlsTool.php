@@ -19,6 +19,15 @@ use Duxbo\Seo\PageSpeed\PageSpeedClient;
  */
 final class CheckUrlsTool implements AiTool, AiToolPreviewable
 {
+    /**
+     * PageSpeed Insights has no batch endpoint — check() makes one
+     * outbound request per URL, synchronously, inside this one tool call,
+     * and each real PSI run typically takes several seconds. A cap keeps
+     * one AI-authored URL list from turning a single tool call into a
+     * multi-minute synchronous request.
+     */
+    private const MAX_URLS = 25;
+
     public function __construct(private readonly PageSpeedClient $client)
     {
     }
@@ -39,7 +48,7 @@ final class CheckUrlsTool implements AiTool, AiToolPreviewable
         return [
             'type' => 'object',
             'properties' => [
-                'urls' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1],
+                'urls' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1, 'maxItems' => self::MAX_URLS],
                 'strategy' => ['type' => 'string', 'enum' => ['mobile', 'desktop'], 'description' => 'Defaults to mobile.'],
             ],
             'required' => ['urls'],
@@ -66,9 +75,19 @@ final class CheckUrlsTool implements AiTool, AiToolPreviewable
     public function execute(array $input, AiToolContext $context): ?array
     {
         $strategy = $this->strategy($input);
+        $urls = $this->urls($input);
+
+        if (count($urls) > self::MAX_URLS) {
+            throw new \InvalidArgumentException(sprintf(
+                'seo.pagespeed.check accepts at most %d URLs per call (got %d) — split this into smaller batches.',
+                self::MAX_URLS,
+                count($urls),
+            ));
+        }
+
         $results = [];
 
-        foreach ($this->urls($input) as $url) {
+        foreach ($urls as $url) {
             try {
                 $results[] = $this->client->check($url, $strategy);
             } catch (PageSpeedFetchFailed $e) {

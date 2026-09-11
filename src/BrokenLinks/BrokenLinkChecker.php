@@ -95,13 +95,24 @@ final class BrokenLinkChecker
     private function request(string $url, string $method, int $timeout): ?Response
     {
         for ($hop = 0; $hop <= self::MAX_REDIRECTS; $hop++) {
-            if (! $this->guard->allows($url)) {
+            $ip = $this->guard->resolve($url);
+
+            if ($ip === null) {
                 return null;
             }
 
             $response = $this->http
                 ->timeout($timeout)
-                ->withOptions(['allow_redirects' => false])
+                ->withOptions([
+                    'allow_redirects' => false,
+                    // Pins the connection to exactly the IP the guard just
+                    // approved, so this request cannot resolve the
+                    // hostname a second time and get a different (DNS
+                    // rebinding) answer — see PublicUrlGuard's own
+                    // docblock for why a second resolution isn't safe to
+                    // trust.
+                    'curl' => [\CURLOPT_RESOLVE => [$this->pinnedHostEntry($url, $ip)]],
+                ])
                 ->{$method}($url);
 
             if (! in_array($response->status(), self::REDIRECT_STATUSES, true)) {
@@ -118,6 +129,23 @@ final class BrokenLinkChecker
         }
 
         return null;
+    }
+
+    /**
+     * `CURLOPT_RESOLVE`'s own syntax: "host:port:address" — cURL uses this
+     * to short-circuit its own DNS lookup for exactly that host/port pair,
+     * connecting straight to the pinned address instead. An IPv6 target
+     * needs brackets in this syntax; the URL's own IPv6 host (if any) does
+     * not (parse_url() already strips them via PublicUrlGuard's handling).
+     */
+    private function pinnedHostEntry(string $url, string $ip): string
+    {
+        $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        $port = parse_url($url, PHP_URL_PORT) ?? ($scheme === 'https' ? 443 : 80);
+        $target = str_contains($ip, ':') ? "[{$ip}]" : $ip;
+
+        return "{$host}:{$port}:{$target}";
     }
 
     private function resolveLocation(string $base, string $location): string

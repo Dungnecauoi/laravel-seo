@@ -120,6 +120,45 @@ final class NotFoundTest extends TestCase
         ]);
     }
 
+    public function test_a_race_between_two_first_sightings_of_the_same_path_does_not_throw(): void
+    {
+        // Simulates a second request inserting the exact same never-before-
+        // seen path in the narrow window between this call's own UPDATE
+        // (which matches nothing, since the path is genuinely new) and its
+        // own INSERT — by inserting the competing row itself the instant
+        // that UPDATE query runs, guaranteeing this call's INSERT collides
+        // on path_hash's unique constraint exactly the way a real
+        // concurrent request would.
+        $path = '/dua-nhau';
+        $hash = md5($path);
+        $alreadyRaced = false;
+
+        DB::listen(function ($query) use ($path, $hash, &$alreadyRaced): void {
+            if ($alreadyRaced || ! str_starts_with(strtolower($query->sql), 'update')) {
+                return;
+            }
+
+            $alreadyRaced = true;
+
+            DB::table('seo_not_found')->insert([
+                'path' => $path,
+                'path_hash' => $hash,
+                'hits' => 1,
+                'first_seen_at' => now(),
+                'last_seen_at' => now(),
+            ]);
+        });
+
+        app(NotFoundLogger::class)->log(new NotFoundHit(path: $path));
+
+        // Neither an uncaught exception (the bug this guards) nor a
+        // duplicate row (the unique constraint would have refused that
+        // outright) — the racing insert's hit, plus this call's own,
+        // finished as an update.
+        $this->assertSame(1, DB::table('seo_not_found')->where('path_hash', $hash)->count());
+        $this->assertSame(2, (int) DB::table('seo_not_found')->where('path_hash', $hash)->value('hits'));
+    }
+
     public function test_a_long_user_agent_is_truncated_rather_than_overflowing(): void
     {
         $this->withHeaders(['User-Agent' => str_repeat('a', 2000)])->get('/khong-co');

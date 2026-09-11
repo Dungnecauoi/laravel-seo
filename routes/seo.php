@@ -59,7 +59,13 @@ $notFoundIngestToken = config('seo.not_found.ingest_token');
 if (is_string($notFoundIngestToken) && $notFoundIngestToken !== '') {
     Route::prefix(config('seo.api.prefix', 'api/seo/v1'))->group(static function (): void {
         Route::post('not-found', [NotFoundIngestController::class, 'store'])
-            ->middleware(['throttle:120,1', VerifyNotFoundIngestToken::class])
+            // Token check first, throttle second: an anonymous caller with
+            // no (or the wrong) token is refused before it ever consumes a
+            // slot in the per-IP throttle bucket — otherwise anyone
+            // sharing a NAT/proxy IP with the legitimate front end's
+            // backend (or simply spamming 401s from that IP) could burn
+            // through the real caller's own budget for the window.
+            ->middleware([VerifyNotFoundIngestToken::class, 'throttle:120,1'])
             ->name('seo.not-found.ingest');
     });
 }

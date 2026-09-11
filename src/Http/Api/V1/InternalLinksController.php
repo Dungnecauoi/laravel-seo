@@ -49,9 +49,11 @@ final class InternalLinksController extends ApiController
         // same behaviour this endpoint always had. A multi-language site
         // must pass it — otherwise incoming/outgoing counts mix rows a
         // per-locale crawl (see seo:internal-links --locale) kept separate
-        // on purpose.
-        $locale = $request->query('locale');
-        $locale = is_string($locale) && $locale !== '' ? $locale : null;
+        // on purpose. Trimmed rather than compared raw: a stray space from
+        // a hand-built query string would otherwise match nothing and
+        // silently report every record as an orphan, indistinguishable
+        // from a genuinely empty result.
+        $locale = self::normalizeLocale($request->query('locale'));
 
         $rows = [];
 
@@ -86,6 +88,11 @@ final class InternalLinksController extends ApiController
         return $this->json([
             'exposedTypes' => $exposed,
             'type' => $type,
+            // Echoed back so a caller whose locale string doesn't match
+            // anything crawled can tell "you filtered by a locale nothing
+            // was stored under" apart from "these pages genuinely have no
+            // incoming links" — both look identical in `data` alone.
+            'locale' => $locale,
             'data' => $rows,
             'meta' => [
                 'currentPage' => $paginator->currentPage(),
@@ -106,14 +113,15 @@ final class InternalLinksController extends ApiController
         $table = (string) config('seo.internal_links.table', 'seo_internal_links');
 
         $type = $request->query('type');
-        $locale = $request->query('locale');
+        $type = is_string($type) && trim($type) !== '' ? trim($type) : null;
+        $locale = self::normalizeLocale($request->query('locale'));
         $query = DB::table($table)->orderByDesc('id');
 
-        if (is_string($type) && $type !== '') {
+        if ($type !== null) {
             $query->where('source_type', $type);
         }
 
-        if (is_string($locale) && $locale !== '') {
+        if ($locale !== null) {
             $query->where('locale', $locale);
         }
 
@@ -135,6 +143,8 @@ final class InternalLinksController extends ApiController
         }, $paginator->items());
 
         return $this->json([
+            'type' => $type,
+            'locale' => $locale,
             'data' => $data,
             'meta' => [
                 'currentPage' => $paginator->currentPage(),
@@ -142,6 +152,26 @@ final class InternalLinksController extends ApiController
                 'total' => $paginator->total(),
             ],
         ]);
+    }
+
+    /**
+     * A stray leading/trailing space in a hand-built query string would
+     * otherwise never match anything stored, silently returning an empty
+     * result indistinguishable from "no rows for this locale" — trimming
+     * (and treating an empty string the same as omitting the parameter
+     * entirely) removes the most common way to type that mistake without
+     * pretending to validate that the value corresponds to a real locale
+     * anything was actually crawled under.
+     */
+    private static function normalizeLocale(mixed $locale): ?string
+    {
+        if (! is_string($locale)) {
+            return null;
+        }
+
+        $locale = trim($locale);
+
+        return $locale !== '' ? $locale : null;
     }
 
     /**

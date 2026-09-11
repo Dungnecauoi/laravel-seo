@@ -189,6 +189,19 @@ final class ReadOnlyHistoryApiTest extends TestCase
         $this->assertSame('https://x/vi', $data[0]['targetUrl']);
     }
 
+    public function test_internal_links_locale_filter_is_trimmed_so_a_stray_space_does_not_silently_return_nothing(): void
+    {
+        DB::table('seo_internal_links')->insert([
+            'source_type' => 'post', 'source_id' => '1', 'target_url' => 'https://x/vi',
+            'target_hash' => md5('/vi'), 'locale' => 'vi', 'created_at' => now(),
+        ]);
+
+        $body = $this->getJson('/api/seo/v1/internal-links/detail?locale='.urlencode(' vi '))->assertOk()->json();
+
+        $this->assertSame('vi', $body['locale']);
+        $this->assertCount(1, $body['data']);
+    }
+
     public function test_search_console_stats_sums_clicks_per_url_and_excludes_old_rows(): void
     {
         DB::table('seo_search_console_stats')->insert([

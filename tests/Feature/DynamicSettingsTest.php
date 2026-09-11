@@ -195,6 +195,17 @@ final class DynamicSettingsTest extends TestCase
         $this->repo()->set('not_found.exclude', ['#(a+)+$#']);
     }
 
+    public function test_a_regex_list_setting_rejects_an_alternation_shaped_catastrophic_pattern(): void
+    {
+        // A different vulnerable shape from the nested-quantifier case
+        // above — ambiguous alternation, not a repeated group. Catching
+        // this only by running the pattern (not by recognising one
+        // specific text shape) is the whole point of the detector.
+        $this->expectException(InvalidSettingValue::class);
+
+        $this->repo()->set('not_found.exclude', ['#(a|aa)+$#']);
+    }
+
     public function test_a_regex_list_setting_rejects_an_invalid_pattern(): void
     {
         $this->expectException(InvalidSettingValue::class);

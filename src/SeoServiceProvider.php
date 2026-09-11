@@ -545,16 +545,25 @@ final class SeoServiceProvider extends ServiceProvider
      * Registered through the kernel rather than the application's own middleware
      * file, which moved in Laravel 11 — this call works on every supported
      * version.
+     *
+     * Unconditional — NOT gated behind seo.redirects.enabled/seo.not_found.enabled.
+     * Those are both dynamic-settings keys, changeable at runtime with no
+     * deploy; whether HandleNotFound is even in the pipeline used to be
+     * decided once, here, from whatever the two flags happened to read at
+     * boot. Under ordinary PHP-FPM that's harmless (boot() re-runs every
+     * request), but under Octane, boot() runs once per worker for its
+     * entire life — a worker that boots with both flags off would never
+     * get the middleware pushed at all, and flipping either flag back on
+     * later through the settings API would silently do nothing until that
+     * worker restarts, indistinguishable from "the setting is broken."
+     * HandleNotFound already re-reads both flags itself on every request
+     * (redirectFor()'s seo.redirects.enabled check, NotFoundLogger::enabled()'s
+     * seo.not_found.enabled check) — the middleware being present costs
+     * nothing when both are off, so there's nothing to gain by deciding
+     * that here instead of there.
      */
     private function registerMiddleware(): void
     {
-        $enabled = $this->app->make(Config::class);
-
-        if ($enabled->get('seo.redirects.enabled', true) !== true
-            && $enabled->get('seo.not_found.enabled', true) !== true) {
-            return;
-        }
-
         if (! $this->app->bound(Kernel::class)) {
             return;
         }

@@ -22,9 +22,28 @@ use Illuminate\Support\Facades\DB;
  * registered here the way `seo.api.models` is for the REST API. Every crawl
  * of one record replaces its rows outright: simpler than diffing, and
  * correct even when a link's anchor text changed since the last run.
+ *
+ * `--locale` mutates the shared application locale for the crawl's
+ * duration (see `handle()`'s own comment on why) — under Octane, where a
+ * single worker can hold several requests in flight via coroutines, two
+ * *overlapping* `--locale` crawls on the same worker would otherwise race
+ * to restore the app locale, potentially leaving it permanently wrong
+ * until the worker restarts. `$localeMutationInProgress` is a
+ * process-wide (static, not per-instance — Artisan builds a fresh command
+ * instance per call) lock that refuses a second concurrent `--locale`
+ * crawl outright rather than let that happen silently. What this does
+ * *not* protect against, because it would need `Contracts\Seoable` itself
+ * to accept a locale rather than reading `app()->getLocale()` implicitly:
+ * an unrelated request on the same worker rendering a page mid-crawl can
+ * still observe the mutated locale for that window. Prefer running a
+ * `--locale` crawl from a real `php artisan` process (or a queued job) on
+ * an Octane deployment with real concurrent traffic, rather than
+ * triggering it synchronously mid-request via `RunInternalLinksCommandTool`.
  */
 final class InternalLinksCommand extends Command
 {
+    private static bool $localeMutationInProgress = false;
+
     protected $signature = 'seo:internal-links
         {model : Fully-qualified class name of the model to scan}
         {--content=body : The model attribute holding page content to search for links}
@@ -58,15 +77,28 @@ final class InternalLinksCommand extends Command
         $locale = $this->option('locale');
         $locale = is_string($locale) && $locale !== '' ? $locale : null;
 
+        if ($locale !== null && self::$localeMutationInProgress) {
+            $this->error(
+                'Another seo:internal-links --locale crawl is already running on '
+                .'this worker — run them one at a time, not concurrently, since '
+                .'each one temporarily mutates the shared application locale.',
+            );
+
+            return self::FAILURE;
+        }
+
         // A model whose seoUrl()/content attribute reads differently per
         // app()->getLocale() (a translatable model) needs the app actually
         // switched to that locale while crawling — restored afterward so a
         // caller running this mid-request (RunInternalLinksCommandTool,
         // via Artisan::call() in the same process) never leaks a locale
-        // change into whatever runs after it.
+        // change into whatever runs after it. The lock above (not this
+        // flag alone) is what stops two such crawls from stepping on each
+        // other's restoration.
         $originalLocale = $this->laravel->getLocale();
 
         if ($locale !== null) {
+            self::$localeMutationInProgress = true;
             $this->laravel->setLocale($locale);
         }
 
@@ -138,6 +170,7 @@ final class InternalLinksCommand extends Command
         } finally {
             if ($locale !== null) {
                 $this->laravel->setLocale($originalLocale);
+                self::$localeMutationInProgress = false;
             }
         }
 

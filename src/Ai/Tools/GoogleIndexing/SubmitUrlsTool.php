@@ -19,6 +19,16 @@ use Duxbo\Seo\GoogleIndexing\GoogleIndexingClient;
  */
 final class SubmitUrlsTool implements AiTool, AiToolPreviewable
 {
+    /**
+     * No batch endpoint exists — submit() makes one outbound request per
+     * URL, synchronously, inside this one tool call. Nothing here enforces
+     * Google's own daily quota (that's account-specific and this package
+     * has no way to know it), but capping how many requests one call can
+     * fire keeps a single AI-authored URL list from either running for an
+     * unreasonable time or single-handedly exhausting a day's quota.
+     */
+    private const MAX_URLS = 100;
+
     public function __construct(private readonly GoogleIndexingClient $client)
     {
     }
@@ -39,7 +49,7 @@ final class SubmitUrlsTool implements AiTool, AiToolPreviewable
         return [
             'type' => 'object',
             'properties' => [
-                'urls' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1],
+                'urls' => ['type' => 'array', 'items' => ['type' => 'string'], 'minItems' => 1, 'maxItems' => self::MAX_URLS],
                 'deleted' => ['type' => 'boolean', 'description' => 'True to notify removal instead of an update.'],
             ],
             'required' => ['urls'],
@@ -65,7 +75,17 @@ final class SubmitUrlsTool implements AiTool, AiToolPreviewable
 
     public function execute(array $input, AiToolContext $context): ?array
     {
-        $results = $this->client->submit($this->urls($input), $this->type($input));
+        $urls = $this->urls($input);
+
+        if (count($urls) > self::MAX_URLS) {
+            throw new \InvalidArgumentException(sprintf(
+                'seo.google_indexing.submit accepts at most %d URLs per call (got %d) — split this into smaller batches.',
+                self::MAX_URLS,
+                count($urls),
+            ));
+        }
+
+        $results = $this->client->submit($urls, $this->type($input));
 
         return [
             'results' => $results,

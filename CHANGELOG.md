@@ -6,6 +6,133 @@ only changes in a major release. The rest of `src/` is free to be refactored.
 
 ## Unreleased
 
+## 0.12.2 — 2026-09-11
+
+Findings from a full security/correctness re-audit of everything added
+since 0.9.0, spread across 3 parallel reviews. Ranked by severity.
+
+### Fixed — SSRF: an obfuscated IP literal bypassed `PublicUrlGuard`
+
+`http://0177.0.0.1/` (and equivalent decimal-integer/hex encodings) was
+not recognised by `filter_var(FILTER_VALIDATE_IP)`, so it fell through to
+DNS resolution as if it were a hostname — resolved to nothing, and looked
+"safe" purely because the guard had no opinion on a string that isn't a
+real domain. The real HTTP client's underlying cURL/libc resolver parses
+the identical string with C-style numeral semantics and connects to
+`127.0.0.1` regardless — a confirmed, working SSRF against this server's
+own loopback via any model content `seo:broken-links` crawls.
+`PublicUrlGuard::looksLikeIpLiteral()` now refuses any host built only
+from digits/dots/an "0x" prefix outright (no real hostname is shaped that
+way, so this never blocks a genuine one) rather than trying to enumerate
+every numeral encoding a resolver might accept.
+
+### Fixed — SSRF: DNS-rebinding gap in `PublicUrlGuard`/`BrokenLinkChecker`
+
+The guard's own DNS lookup and the HTTP client's independent lookup
+moments later were two separate resolutions of the same hostname, with no
+IP pinning between them — a very-short-TTL DNS record under attacker
+control could answer publicly for the check and privately for the real
+connection. `PublicUrlGuard::resolve()` now returns the exact IP it
+approved, and `BrokenLinkChecker` pins the real request to that literal
+address via `CURLOPT_RESOLVE` rather than letting the hostname resolve a
+second time.
+
+### Fixed — `registerMiddleware()` could permanently disable 404 logging/redirects on one Octane worker
+
+Same class of bug as the `runningInConsole()` commands() fix two releases
+ago: whether `HandleNotFound` was ever pushed onto the middleware stack
+was decided once, from whatever `seo.redirects.enabled`/`seo.not_found.enabled`
+read at boot. A worker that booted with both flags off would never get
+the middleware at all, and flipping either back on later through Dynamic
+Settings (which only ever rewrites the live `Config` singleton, never
+re-runs a provider's `boot()`) would silently do nothing until that
+worker restarted. The middleware is now pushed unconditionally —
+`HandleNotFound` already re-reads both flags itself on every request, so
+there's nothing to gain by deciding this at boot instead.
+
+### Fixed — `CatastrophicPattern` only caught nested-quantifier ReDoS, not alternation-based
+
+`(a|aa)+$` (ambiguous alternation, a different vulnerable shape from
+`(a+)+`) sailed straight through the old signature-matching regex and
+demonstrably burned real CPU via `pcre.backtrack_limit` exhaustion on
+every 404, reachable by any anonymous visitor. Rewritten to actually
+*run* the pattern against a handful of short, deliberately non-matching
+probe strings and check whether PCRE's own backtrack-limit safety net
+had to step in, rather than recognising one specific dangerous construct
+— generalises to shapes this class was never told about by name. Also
+fixed in the same change: the probes now try both a bare and a
+`/`-prefixed form, since every pattern this class guards matches against
+a URL path and a `^/(a+)+$`-style pattern's own anchor was failing the
+bare probe before backtracking ever began, wrongly looking safe.
+
+### Fixed — `NotFoundLogger::log()`'s upsert was a TOCTOU race that surfaced as an uncaught 500
+
+Two requests reporting the same never-before-seen path at the same
+moment could both see the UPDATE match nothing and both attempt the
+INSERT; the second threw an uncaught `UniqueConstraintViolationException`
+straight through `HandleNotFound`/`NotFoundIngestController`, turning an
+ordinary 404 into a 500 for whichever visitor (or SPA backend) lost the
+race. The INSERT branch now catches that specific exception and finishes
+as an update instead — verified with a test that deliberately triggers
+the exact race via a `DB::listen()` hook, not just a sequential re-run.
+
+### Fixed — batch size was unenforced on 3 AI tools making one real outbound request per URL
+
+`seo.google_indexing.submit`, `seo.pagespeed.check`, and
+`seo.search_console.inspect` looped every URL in `execute()` synchronously
+with no cap — a single AI-authored URL list could run for an unreasonable
+time or, for Search Console's own tightly-quota'd URL Inspection API
+(~2,000 requests/day/site), exhaust a meaningful fraction of a whole
+day's quota in one call. Each now refuses a batch over a fixed limit
+(100/25/50 respectively) before making any request.
+
+### Fixed — the 404 ingest endpoint's throttle ran before its own auth check
+
+`throttle:120,1` was listed before `VerifyNotFoundIngestToken`, so an
+unauthenticated caller (wrong token, no token) consumed the same per-IP
+bucket as a legitimate one — anyone sharing that IP (or simply spamming
+401s) could exhaust the real caller's own budget for the window. Token
+check now runs first.
+
+### Fixed — three lower-severity gaps found in the same audit
+
+- `InternalLinksController`'s `?locale=`/`?type=` filters are now trimmed;
+  a stray space previously matched nothing and silently reported every
+  record as an orphan instead of an error. Both endpoints now also echo
+  back the `locale` actually applied, so a caller can tell "nothing was
+  crawled under this locale" apart from "these pages genuinely have no
+  incoming links."
+- `SampleRateSettingValidator` now explicitly rejects `NAN` (any
+  comparison against `NAN` is false under IEEE-754, so the old bounds
+  check silently let it through) — not reachable via the shipped
+  JSON-decoded write path, but a real defensive gap for any future caller
+  that isn't one.
+- `seo_internal_links` gained a real unique constraint on
+  `(source_type, source_id, locale, target_hash)`, so two *overlapping*
+  crawls of the same source+locale now fail loudly instead of silently
+  leaving duplicate rows that inflate `incomingLinks`/`outgoingLinks`
+  counts. Standard SQL treats two `NULL` locales as distinct for
+  uniqueness, so this protects a site that crawls with an explicit
+  `--locale`, not a single-language site — a pre-existing limitation this
+  column doesn't introduce.
+
+### Changed — `seo:internal-links --locale` now refuses to run concurrently with itself on one worker
+
+Mutating the shared application locale for the crawl's duration (needed
+so a translatable model's `seoUrl()`/content reads the right language)
+has an inherent gap under Octane: two *overlapping* `--locale` crawls on
+the same worker could race to restore the app locale afterward,
+potentially leaving it permanently wrong until the worker restarts. A
+process-wide lock now refuses a second concurrent `--locale` crawl
+outright rather than let that happen. What this does **not** protect
+against — an unrelated request on the same worker observing the mutated
+locale for the crawl's own duration — would need `Contracts\Seoable`
+itself to accept a locale explicitly rather than reading
+`app()->getLocale()` implicitly, a larger change than this release makes;
+prefer a real `php artisan` process or a queued job over triggering this
+synchronously mid-request on an Octane deployment with real concurrent
+traffic.
+
 ## 0.12.1 — 2026-09-10
 
 ### Fixed

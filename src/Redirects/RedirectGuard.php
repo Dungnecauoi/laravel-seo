@@ -61,13 +61,23 @@ final class RedirectGuard
             return;
         }
 
+        // $source is stored (and typed here) without its own PCRE
+        // delimiters — delimited once, up front, so both checks below run
+        // against a string preg_match() can actually parse. Passing the
+        // raw, undelimited $source straight to CatastrophicPattern::detected()
+        // would make PCRE treat $source's own first character ("^" for a
+        // path-anchored pattern) as the delimiter and fail every probe
+        // with "no ending delimiter" instead of ever running them — a
+        // false "safe" for exactly the shape this exists to catch.
+        $delimited = $this->delimit($source);
+
         // Nested quantifiers are the shape that makes a pattern take
         // exponential time on a crafted path, hanging the request.
-        if (CatastrophicPattern::detected($source)) {
+        if (CatastrophicPattern::detected($delimited)) {
             throw UnsafeRedirect::catastrophicPattern($source);
         }
 
-        $valid = @preg_match($this->delimit($source), '');
+        $valid = @preg_match($delimited, '');
 
         if ($valid === false) {
             throw UnsafeRedirect::invalidPattern($source);

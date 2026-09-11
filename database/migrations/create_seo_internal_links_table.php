@@ -37,7 +37,18 @@ return new class extends Migration
             // Every crawl of one source (for one locale) deletes its old
             // rows for that same source+locale and inserts the current set,
             // rather than trying to diff and update in place — simpler, and
-            // correct even when a link's anchor text changed.
+            // correct even when a link's anchor text changed. The unique
+            // constraint below is what makes two *overlapping* crawls of
+            // the same source+locale (a manual run racing a scheduled one)
+            // fail loudly with a constraint violation instead of silently
+            // leaving duplicate rows that inflate incomingLinks/outgoingLinks
+            // counts — standard SQL treats two NULL locales as distinct
+            // values for uniqueness purposes, so this only actually
+            // protects a site that crawls with an explicit --locale; a
+            // single-language site (locale always NULL) does not get this
+            // guarantee, a pre-existing limitation this column doesn't
+            // introduce.
+            $table->unique(['source_type', 'source_id', 'locale', 'target_hash'], 'seo_internal_links_unique');
             $table->index(['source_type', 'source_id', 'locale'], 'seo_internal_links_source_index');
             $table->index('target_hash', 'seo_internal_links_target_index');
         });

@@ -22,7 +22,14 @@ final class SampleRateSettingValidator implements SettingValueValidator
 
         $rate = (float) $value;
 
-        if ($rate < 0.0 || $rate > 1.0) {
+        // is_nan() is checked explicitly because NAN fails both bound
+        // comparisons below (any comparison against NAN is false under
+        // IEEE-754), so a naive range check alone would let it through —
+        // not reachable through the JSON-decoded write path this
+        // validator is actually wired to today (JSON has no NaN literal),
+        // but this validator has no way to know every future caller will
+        // route through JSON.
+        if (is_nan($rate) || $rate < 0.0 || $rate > 1.0) {
             throw InvalidSettingValue::make($key, 'must be between 0.0 and 1.0.');
         }
     }

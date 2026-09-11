@@ -8,6 +8,7 @@ use Duxbo\Seo\Data\NotFoundHit;
 use Duxbo\Seo\Events\NotFoundLogged;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -54,17 +55,39 @@ final class NotFoundLogger
             ]);
 
         if ($affected === 0) {
-            DB::table($table)->insert([
-                'path' => $path,
-                'path_hash' => $hash,
-                'hits' => 1,
-                'referrer' => $this->truncate($hit->referrer),
-                'user_agent' => $this->truncate($hit->userAgent),
-                'first_seen_at' => $now,
-                'last_seen_at' => $now,
-            ]);
+            try {
+                DB::table($table)->insert([
+                    'path' => $path,
+                    'path_hash' => $hash,
+                    'hits' => 1,
+                    'referrer' => $this->truncate($hit->referrer),
+                    'user_agent' => $this->truncate($hit->userAgent),
+                    'first_seen_at' => $now,
+                    'last_seen_at' => $now,
+                ]);
 
-            $this->enforceRowLimit();
+                $this->enforceRowLimit();
+            } catch (UniqueConstraintViolationException) {
+                // Another request inserted this exact path in the window
+                // between our UPDATE above (which matched nothing, since
+                // the row didn't exist yet) and this INSERT racing it —
+                // path_hash carries a real unique constraint, so the two
+                // concurrent "first sighting" requests can't both win.
+                // Finish as an update instead of letting the constraint
+                // violation propagate: uncaught, this turned an ordinary
+                // 404 into a 500 for whichever visitor lost the race, and
+                // the new ingest endpoint's higher write concurrency made
+                // that far easier to hit than it was when only real
+                // browser traffic reached this method.
+                DB::table($table)
+                    ->where('path_hash', $hash)
+                    ->update([
+                        'hits' => DB::raw('hits + 1'),
+                        'last_seen_at' => $now,
+                        'referrer' => $this->truncate($hit->referrer),
+                        'user_agent' => $this->truncate($hit->userAgent),
+                    ]);
+            }
         }
 
         $this->events->dispatch(new NotFoundLogged($path, $hit));
